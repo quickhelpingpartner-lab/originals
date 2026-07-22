@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QHP Customer Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <style>
+        /* Global CSS Reset & Native App Feel Updates */
+        * { 
+            margin:0; 
+            padding:0; 
+            box-sizing:border-box; 
+            font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+        
+        body { background:#f4f7fb; display:flex; min-height: 100vh; overflow-x: hidden; -webkit-user-select: none; user-select: none; }
+        
+        input, textarea, select { -webkit-user-select: text; user-select: text; }
+
+        #auth-container {
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background:#f4f7fb; z-index: 9999; display: flex; justify-content: center; align-items: center;
+        }
+        .auth-card {
+            background: #fff; padding: 40px; border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 420px;
+        }
+        .auth-title { font-size: 28px; font-weight: bold; color: #0D47A1; margin-bottom: 8px; text-align: center;}
+        .auth-title span { color: #FF9800; }
+        .auth-subtitle { color: #666; text-align: center; margin-bottom: 24px; font-size: 14px; }
+        .auth-toggle-text { text-align: center; margin-top: 16px; font-size: 14px; color: #555; }
+        .auth-toggle-text span { color: #0D47A1; cursor: pointer; font-weight: bold; }
+        
+        .qhp-alert-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.4); z-index: 10000;
+            display: none; justify-content: center; align-items: center;
+            animation: fadeIn 0.2s ease;
+        }
+        .qhp-alert-card {
+            background: #ffffff; padding: 30px; border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: 90%; max-width: 400px;
+            text-align: center; animation: slideUp 0.2s ease;
+        }
+        .qhp-alert-card i { font-size: 46px; margin-bottom: 15px; }
+        .qhp-alert-card i.info-icon { color: #0D47A1; }
+        .qhp-alert-card i.error-icon { color: #d32f2f; }
+        .qhp-alert-card p { font-size: 15px; color: #333; font-weight: bold; margin-bottom: 20px; line-height: 1.4; }
+        .qhp-alert-btn {
+            background: #0D47A1; color: #fff; border: none; padding: 10px 24px;
+            border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s;
+        }
+        .qhp-alert-btn:hover { background: #0B3C8F; }
+
+        .sidebar { 
+            width:70px; height:100vh; background:#fff; padding:20px 0; 
+            box-shadow:2px 0 10px rgba(0,0,0,.08); position:fixed; left:0; top:0;
+            display:flex; flex-direction:column; align-items:center;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index:3000; overflow-y:auto;
+        }
+        .sidebar.expanded { width:250px; align-items:flex-start; padding:20px; }
+        .logo { font-size:28px; font-weight:bold; color:#0D47A1; margin-bottom:30px; display:none; }
+        .logo.show { display:block; }
+        .logo span { color:#FF9800; }
+        
+        .menu-toggle {
+            background:none; border:none; font-size:24px; color:#0D47A1;
+            cursor:pointer; margin-bottom:30px; transition:0.3s;
+        }
+        .menu-toggle:hover { transform:scale(1.1); }
+        .sidebar ul { list-style:none; width:100%; }
+        .sidebar li { 
+            padding:14px; border-radius:10px; margin-bottom:8px; cursor:pointer; 
+            transition:.3s; text-align:center; position:relative; color: #555; white-space: nowrap;
+        }
+        .sidebar.expanded li { text-align:left; width: 100%; }
+        .sidebar li:hover, .sidebar li.active { background:#eaf2ff; color:#0D47A1; font-weight:bold; }
+        .sidebar li span { display:none; }
+        .sidebar.expanded li span { display:inline; margin-left:10px; }
+        .sidebar li i { font-size:20px; }
+        
+        .main { flex:1; padding:0; overflow-y:auto; margin-left:70px; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: calc(100% - 70px); }
+        .sidebar.expanded ~ .main { margin-left:250px; width: calc(100% - 250px); }
+        .content { padding:25px; }
+        
+        .topbar { display:flex; justify-content: space-between; align-items:center; margin-bottom:30px; gap:15px; width: 100%; }
+        .topbar-left { display: flex; align-items: center; }
+        .topbar-left .menu-toggle { display: none; }
+        .topbar-right { display:flex; align-items:center; gap:15px; }
+
+        .topbar-location-display {
+            display: flex; align-items: center; gap:8px; background: #fff; padding: 10px 16px; border-radius: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.04); font-size: 13px; font-weight: bold; color: #0D47A1; cursor: pointer; transition: 0.3s ease; border: 1px solid #eef2f7;
+        }
+        .topbar-location-display:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(13,71,161,0.1); }
+        .topbar-location-display i { color: #d32f2f; font-size: 15px; }
+        .location-text-truncate { max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .location-spinner {
+            display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(13,71,161,0.2);
+            border-top: 2px solid #0D47A1; border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
+        
+        .profile { display:flex; align-items:center; cursor:pointer; }
+        .profile-avatar-circle {
+            width: 46px; height: 46px; border-radius: 50%; background-color: #0D47A1; color: #ffffff;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; border: 2px solid #0D47A1; text-transform: uppercase; box-shadow: 0 2px 8px rgba(13,71,161,0.2);
+        }
+        
+        .hotline-banner {
+            display: none; background: #FFF3E0; border: 1px solid #FFE0B2; border-left: 5px solid #FF9800;
+            padding: 14px 18px; border-radius: 8px; font-size: 14px; font-weight: bold; color: #E65100;
+            margin-bottom: 25px; align-items: center; gap: 10px;
+        }
+        .hotline-banner i { font-size: 18px; }
+
+        .grocery-mode-toggle { display: flex; gap: 10px; margin-bottom: 20px; }
+        .mode-btn { flex: 1; padding: 12px; border: 2px solid #e2e8f0; background: #fff; border-radius: 8px; cursor: pointer; font-weight: bold; color: #475569; transition: 0.2s; }
+        .mode-btn.active { border-color: #2e7d32; background: #f0fdf4; color: #2e7d32; }
+
+        .cards { display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px; }
+        .card { 
+            color:#fff; padding:30px 25px; border-radius:20px; transition:.3s ease; cursor:pointer; text-decoration:none; box-shadow:0 4px 15px rgba(0,0,0,0.06);
+            display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 140px; text-align: center; gap: 12px;
+        }
+        .card:hover { transform:translateY(-8px); box-shadow:0 12px 24px rgba(0,0,0,0.15); }
+
+        .food { background:linear-gradient(135deg, #FF9800, #FF7043); } 
+        .medicine { background:linear-gradient(135deg, #2962ff, #1a47a0); } 
+        .grocery { background:linear-gradient(135deg, #2e7d32, #1b5e20); } 
+        .parcel { background:linear-gradient(135deg, #9c27b0, #7b1fa2); }
+        .card h2 { font-size:20px; font-weight:bold; }
+        
+        .orders { background:#fff; padding:25px; border-radius:18px; box-shadow:0 5px 15px rgba(0,0,0,.04); }
+        .orders h2 { margin-bottom:20px; color:#0D47A1; font-size:20px; font-weight: 700; letter-spacing: -0.5px; }
+        
+        /* Ultra-Premium Order Card Feed System UI layout */
+        #orders-realtime-feed { display: flex; flex-direction: column; gap: 18px; margin-top: 15px; }
+        
+        .premium-order-card {
+            border-radius: 18px; padding: 22px; display: flex; justify-content: space-between; align-items: stretch;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); border: 1px solid #eef2f7; position: relative; overflow: hidden;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.03); background: #ffffff;
+        }
+        .premium-order-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); }
+        
+        /* Premium Background Gradient Matrix based on Order Pipeline Processing States */
+        .state-processing { border-left: 6px solid #FF9800; background: linear-gradient(145deg, #ffffff 0%, #fffbf4 100%); }
+        .state-confirmed { border-left: 6px solid #2e7d32; background: linear-gradient(145deg, #ffffff 0%, #f5faf5 100%); }
+        .state-transit { border-left: 6px solid #2962ff; background: linear-gradient(145deg, #ffffff 0%, #f4f8ff 100%); }
+        .state-complete { border-left: 6px solid #64748b; background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); opacity: 0.95; }
+
+        .order-main-body { width: 72%; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+        .order-header-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .order-id-tag { font-weight: 800; color: #1e293b; font-size: 16px; letter-spacing: -0.3px; }
+        .order-type-chip { font-size: 11px; padding: 4px 9px; border-radius: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(13, 71, 161, 0.06); color: #0D47A1; }
+        
+        /* Ordered Date & Time UI Label style placement */
+        .order-date-label { font-size: 12px; color: #64748b; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        
+        .order-vendor { color: #1e3a8a; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 5px; }
+        .order-details-text { font-size: 13px; color: #334155; line-height: 1.5; font-weight: 500; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.02); }
+        .order-driver-meta { font-size: 12px; color: #475569; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+        
+        .order-action-aside { width: 28%; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; text-align: right; }
+        
+        .premium-status-badge {
+            font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 30px; text-transform: uppercase;
+            letter-spacing: 0.7px; display: inline-block; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .premium-status-badge.badge-processing { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+        .premium-status-badge.badge-confirmed { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+        .premium-status-badge.badge-transit { background: #eaf2ff; color: #0D47A1; border: 1px solid #dbeafe; }
+        .premium-status-badge.badge-complete { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+        .btn-feed-track { background: linear-gradient(135deg, #0D47A1, #1a237e); color: #fff; border: none; padding: 9px 15px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: 0.2s; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 4px 12px rgba(13,71,161,0.25); }
+        .btn-feed-track:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(13,71,161,0.35); }
+
+        /* Premium Profile Layout Container */
+        .premium-profile-card { background: linear-gradient(135deg, #ffffff 0%, #fcfdfe 100%); border-radius: 20px; padding: 5px; }
+        .premium-profile-header { display: flex; flex-direction: column; align-items: center; text-align: center; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px dashed #e2e8f0; }
+        .premium-profile-badge-avatar { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #0D47A1, #1e3a8a); color: #fff; font-size: 32px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(13,71,161,0.25); margin-bottom: 12px; border: 3px solid #fff; }
+        .premium-profile-tier { font-size: 11px; background: gold; color: #7f5f00; padding: 2px 10px; border-radius: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 5px rgba(255,215,0,0.3); }
+        
+        .modal { display:none; position:fixed; z-index:5000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.4); animation:fadeIn 0.3s ease; }
+        .modal.show { display:flex; align-items:center; justify-content:center; }
+        .modal-content { background-color:#fff; padding:30px; border-radius:15px; width:90%; max-width:500px; box-shadow:0 10px 30px rgba(0,0,0,0.2); max-height:90vh; overflow-y:auto; animation:slideUp 0.3s ease; }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:25px; border-bottom:2px solid #eee; padding-bottom:15px; }
+        .close { font-size:28px; font-weight:bold; color:#aaa; cursor:pointer; transition:.3s; }
+        
+        .form-group { margin-bottom:20px; }
+        .form-group label { display:block; margin-bottom:8px; color:#475569; font-weight:700; font-size:13px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .form-group input, .form-group textarea, .form-group select { width:100%; padding:12px 16px; border:1px solid #cbd5e1; border-radius:10px; font-size:14px; background:#fff; transition: 0.2s; color: #1e293b; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline:none; border-color:#0D47A1; box-shadow:0 0 0 3px rgba(13,71,161,0.15); }
+        .form-group input:read-only { background-color: #f8fafc; color: #64748b; cursor: not-allowed; border-color: #e2e8f0; font-weight: 500; }
+        
+        .med-builder-row { display: flex; gap: 16px; margin-bottom: 24px; width: 100%; }
+        .med-builder-col { display: flex; flex-direction: column; flex: 1; }
+        .med-builder-col label { font-size: 14px; font-weight: bold; color: #2e7d32; margin-bottom: 10px; text-align: left; }
+        .med-builder-col input { width: 100%; padding: 14px 16px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: #ffffff; color: #333; outline: none; }
+        .med-builder-col input:focus { border-color: #2e7d32; box-shadow: 0 0 6px rgba(46,125,50,0.2); }
+        .med-builder-col.wide { flex: 1.4; }
+        
+        .category-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .category-card { background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; font-weight: bold; color:#475569; }
+        .category-card:hover { border-color: #2e7d32; background: #f0fdf4; }
+        .category-card.selected { border-color: #2e7d32; background: #dcfce7; color: #16a34a; }
+        .category-icon { font-size: 26px; margin-bottom: 6px; }
+
+        .btn-confirm-med { background-color: #4CAF50; color: #fff; margin-bottom: 24px; display: flex; justify-content: center; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; padding: 14px; border:none; border-radius: 8px; width: 100%; cursor: pointer; transition: 0.2s background; }
+        .btn-confirm-med:hover { background-color: #43a047; }
+        
+        .med-manifest-box { background: #f4f7ff; padding: 20px; border-radius: 12px; border-left: 5px solid #2962ff; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(41,98,255,0.05); }
+        .med-manifest-box.grocery-manifest-theme { border-left-color: #2e7d32; background: #f0fdf4; }
+        .med-manifest-title { font-size: 14px; font-weight: bold; color: #2962ff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .med-manifest-title.grocery-manifest-theme { color:#2e7d32; }
+        .med-manifest-box em { color: #777; font-size: 13px; font-style: italic; }
+        .med-item-chip { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 10px 14px; border-radius: 6px; border: 1px solid #dbe4ff; margin-bottom: 8px; font-size: 13px; color: #333; }
+        .btn-delete-chip { background: none; border: none; color: #dc2626; cursor: pointer; font-size: 14px; }
+
+        .btn { padding:13px 22px; border:none; border-radius:10px; cursor:pointer; font-size:14px; font-weight:bold; transition:.2s ease-in-out; text-align: center; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background:#0D47A1; color:#fff; flex:1; }
+        .btn-primary:hover:not(:disabled) { background:#0B3C8F; transform:translateY(-1px); box-shadow: 0 4px 12px rgba(13,71,161,0.2); }
+        .btn-map-launch { background:#9c27b0; color:#fff; margin-bottom:10px; }
+        .btn-map-launch:hover { background:#7b1fa2; }
+
+        .btn-med-submit { background: linear-gradient(135deg, #2962ff, #1a47a0); color: #ffffff; font-size: 15px; padding: 14px 24px; box-shadow: 0 4px 15px rgba(41,98,255,0.25); }
+        .btn-med-submit:hover { background: linear-gradient(135deg, #1a47a0, #11306b); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(41,98,255,0.35); }
+        .btn-grocery-submit { background: linear-gradient(135deg, #2e7d32, #1b5e20); color: #ffffff; font-size: 15px; padding: 14px 24px; box-shadow: 0 4px 15px rgba(46,125,50,0.25); border:none; border-radius:8px; width:100%; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+        .btn-grocery-submit:hover { background: linear-gradient(135deg, #1b5e20, #114216); transform: translateY(-2px); }
+
+        .profile-btn-group { display: flex; align-items: center; gap: 14px; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        .btn-secondary-flat { background: #f1f3f9; color: #445566; flex: 1; }
+        .btn-secondary-flat:hover { background: #e4e8f1; color: #223344; }
+        .btn-danger-modern { background: #fff1f1; color: #d32f2f; border: 1px solid #ffcccc; flex: 1.2; }
+        .btn-danger-modern:hover { background: #dc2626; color: #ffffff; border-color: #dc2626; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
+
+        .page-container { display: none; }
+        .page-container.active-view { display: block; }
+        .food-form-panel { background: #ffffff; padding: 30px; border-radius: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #eef2f7; }
+        .inline-map-box { width: 100%; height: 280px; border-radius: 12px; border: 1px solid #ddd; margin: 10px 0; }
+
+        .map-modal-content { width:95%; max-width:700px; max-height:90vh; }
+        #mapContainer, #trackingMapContainer, #fullscreenPickMapContainer { width:100%; height:450px; border-radius:12px; margin-bottom:20px; border:1px solid #e0e0e0; }
+        .location-info { background:#f9f9f9; padding:15px; border-radius:10px; margin-bottom:15px; border-left:4px solid #0D47A1; }
+        .hidden { display: none !important; }
+
+        .time-tracker-box {
+            background: #fff; border: 1px dashed #cbd5e1; padding: 10px; border-radius: 8px;
+            margin-top: 8px; font-size: 12px; color: #475569; display: flex; flex-direction: column; gap: 3px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        @media(max-width: 768px) { 
+            body { flex-direction: column; }
+            .sidebar { 
+                width: 250px; left: -260px; position: fixed; height: 100vh;
+                box-shadow: 4px 0 15px rgba(0,0,0,0.15); align-items: flex-start; padding: 20px;
+            }
+            .sidebar.expanded { left: 0px; }
+            .sidebar ul { width: 100%; }
+            .sidebar li { text-align: left; width: 100%; }
+            .sidebar li span { display: inline !important; margin-left: 10px; }
+            .logo { display: block !important; }
+            .main { margin-left: 0 !important; width: 100% !important; }
+            .content { padding: 16px; }
+            .topbar { justify-content: space-between; background: #fff; padding: 12px 16px; margin: -16px -16px 20px -16px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+            .topbar-left .menu-toggle { display: block; }
+            .cards { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+            .med-builder-row { flex-direction: column; gap: 15px; }
+            .profile-btn-group { flex-direction: column; gap: 10px; }
+            
+            .premium-order-card { flex-direction: column; gap: 16px; }
+            .order-main-body { width: 100%; }
+            .order-action-aside { width: 100%; align-items: flex-start; min-height: auto; gap: 10px; }
+        }
+    </style>
+</head>
+<body onclick="handleGlobalClick(event)">
+
+    <div id="qhp-custom-alert" class="qhp-alert-overlay">
+        <div class="qhp-alert-card">
+            <i id="qhp-alert-icon" class="fas fa-circle-info info-icon"></i>
+            <p id="qhp-alert-text">Notification text block message.</p>
+            <button class="qhp-alert-btn" onclick="dismissCustomAlert()">OK</button>
+        </div>
+    </div>
+
+    <div id="auth-container">
+        <div class="auth-card" id="login-window">
+            <div class="auth-title">QHP <span>Customer</span></div>
+            <div class="auth-subtitle">Welcome back! Access your workspace</div>
+            <div id="login-form-step">
+                <div class="form-group"><label>Email Address</label><input type="email" id="li-email" placeholder="enter email"></div>
+                <button id="btn-login-send-otp" class="btn btn-primary" onclick="handleLoginSendOTP()">Send Secure Link OTP</button>
+            </div>
+            <div id="login-otp-step" class="hidden">
+                <div class="form-group"><label>Enter Security OTP</label><input type="text" id="li-otp" placeholder="6-digit Code"></div>
+                <button class="btn btn-primary" onclick="handleLoginVerifyOTP()">Confirm Login</button>
+            </div>
+            <div class="auth-toggle-text">New to QHP? <span onclick="toggleAuthWindows(true)">Create account</span></div>
+        </div>
+
+        <div class="auth-card hidden" id="signup-window">
+            <div class="auth-title">QHP <span>Customer</span></div>
+            <div class="auth-subtitle">Create your customer account</div>
+            <div id="signup-form-step">
+                <div class="form-group"><label>Full Name</label><input type="text" id="su-name" placeholder="Enter Full Name"></div>
+                <div class="form-group"><label>Email Address</label><input type="email" id="su-email" placeholder="enter email"></div>
+                <div class="form-group"><label>Phone Number</label><input type="tel" id="su-phone" placeholder="Enter Phone Number"></div>
+                <button id="btn-signup-send-otp" class="btn btn-primary" onclick="handleSignUpSendOTP()">Send Verification OTP</button>
+            </div>
+            <div id="signup-otp-step" class="hidden">
+                <div class="form-group"><label>Enter OTP sent to Email</label><input type="text" id="su-otp" placeholder="6-digit Code"></div>
+                <button class="btn btn-primary" onclick="handleSignUpVerifyOTP()">Verify & Register</button>
+            </div>
+            <div class="auth-toggle-text">Already have an account? <span onclick="toggleAuthWindows(false)">Log in</span></div>
+        </div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <button class="menu-toggle" onclick="toggleSidebar(event)"><i class="fas fa-bars"></i></button>
+        <div class="logo" id="sidebarLogo">QHP <span>Customer</span></div>
+        <ul>
+            <li class="active" id="nav-dashboard" onclick="navigateTo('dashboard')"><i class="fas fa-home"></i> <span>Dashboard</span></li>
+            <li id="nav-food" onclick="navigateTo('food')"><i class="fas fa-utensils"></i> <span>Order Food</span></li>
+            <li id="nav-medicine" onclick="navigateTo('medicine')"><i class="fas fa-pills"></i> <span>Medicines</span></li>
+            <li id="nav-grocery" onclick="navigateTo('grocery')"><i class="fas fa-shopping-cart"></i> <span>Grocery Hub</span></li>
+            <li id="nav-parcel" onclick="navigateTo('parcel')"><i class="fas fa-box"></i> <span>Parcel Route</span></li>
+            <li onclick="openProfile()"><i class="fas fa-user-circle"></i> <span>My Profile</span></li>
+            <li onclick="logoutSystem()" style="color: #d32f2f;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></li>
+        </ul>
+    </div>
+
+    <div class="main">
+        <div class="content">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <button class="menu-toggle" onclick="toggleSidebar(event)" style="margin-bottom:0; margin-right: 15px;"><i class="fas fa-bars"></i></button>
+                    <div class="topbar-location-display" onclick="openLocationMap()">
+                        <i class="fas fa-location-crosshairs"></i>
+                        <span id="locationLoaderSpan" class="location-spinner"></span>
+                        <span id="currentAreaText" class="location-text-truncate">Detecting Location...</span>
+                    </div>
+                </div>
+                <div class="topbar-right"><div class="profile" onclick="openProfile()"><div class="profile-avatar-circle" id="userAvatarInitial">-</div></div></div>
+            </div>
+
+            <div id="view-dashboard" class="page-container active-view">
+                <section class="cards">
+                    <div class="card food" onclick="navigateTo('food')"><i class="fas fa-utensils" style="font-size:26px;"></i><h2>🍔 Food Services</h2></div>
+                    <div class="card medicine" onclick="navigateTo('medicine')"><i class="fas fa-pills" style="font-size:26px;"></i><h2>💊 Medicines</h2></div>
+                    <div class="card grocery" onclick="navigateTo('grocery')"><i class="fas fa-shopping-cart" style="font-size:26px;"></i><h2>🛒 Grocery Hub</h2></div>
+                    <div class="card parcel" onclick="navigateTo('parcel')"><i class="fas fa-box" style="font-size:26px;"></i><h2>📦 Express Parcel</h2></div>
+                </section>
+                <div class="orders">
+                    <h2>Active Transaction Status Records</h2>
+                    <div id="orders-realtime-feed"><p style="color: #888; font-size: 14px;">No active entries generated yet.</p></div>
+                </div>
+            </div>
+
+            <div id="view-food" class="page-container">
+                <div class="food-form-panel">
+                    <div id="food-hotline-container" class="hotline-banner">
+                        <i class="fas fa-phone-volume"></i>
+                        <span>Call Service Also Available: <a id="food-hotline-link" href="#" style="color:#E65100; text-decoration:underline; font-weight:bold;">-</a></span>
+                    </div>
+                    <h2 style="color: #0D47A1; margin-bottom: 20px;"><i class="fas fa-utensils"></i> Food Routing Dispatch Request</h2>
+                    <div class="form-group"><label>Restaurant Name Target Box</label><input type="text" id="food-merchant-name" placeholder="Enter restaurant name..."></div>
+                    <div class="form-group">
+                        <label>Select Delivery Destination Drop-Point</label>
+                        <button class="btn btn-map-launch" onclick="launchSubPageMapPicker('food')"><i class="fas fa-expand"></i> Choose Map in Full Screen</button>
+                        <div id="foodSelectionMap" class="inline-map-box"></div>
+                        <p style="font-size: 12px; color: #555; margin-top: 5px;"><strong>Selected Delivery Vectors:</strong> Lat <span id="foodLat">-</span>, Lng <span id="foodLng">-</span></p>
+                    </div>
+                    <div class="form-group"><label>Your Full Name</label><input type="text" id="food-cust-name" placeholder="Enter recipient full name"></div>
+                    <div class="form-group"><label>Contact Phone Number</label><input type="tel" id="food-cust-phone" placeholder="Enter active mobile line"></div>
+                    <div class="form-group"><label>Describe Food Request Specification Details</label><textarea id="food-cust-description" rows="4" placeholder="What food details do you need?"></textarea></div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn btn-primary" onclick="executeFoodOrderSubmit()">Submit Order Request</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-medicine" class="page-container">
+                <div class="food-form-panel">
+                    <div id="medicine-hotline-container" class="hotline-banner">
+                        <i class="fas fa-phone-volume"></i>
+                        <span>Call Service Also Available: <a id="medicine-hotline-link" href="#" style="color:#E65100; text-decoration:underline; font-weight:bold;">-</a></span>
+                    </div>
+                    <h2 style="color: #2962ff; margin-bottom: 20px;"><i class="fas fa-pills"></i> Medicine Routing Dispatch Request</h2>
+                    
+                    <div class="med-builder-row">
+                        <div class="med-builder-col wide">
+                            <label>Medicine Name</label>
+                            <input type="text" id="med-name-input" placeholder="e.g., Paracetamol">
+                        </div>
+                        <div class="med-builder-col">
+                            <label>Dosage (mg)</label>
+                            <input type="text" id="med-dosage-input" placeholder="e.g., 500mg">
+                        </div>
+                        <div class="med-builder-col">
+                            <label>Quantity</label>
+                            <input type="text" id="med-qty-input" placeholder="How many?">
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-confirm-med" onclick="executeLocalMedItemConfirm()"><i class="fas fa-square-check"></i> Confirm Medicine</button>
+
+                    <div class="med-manifest-box">
+                        <div class="med-manifest-title"><i class="fas fa-clipboard-list"></i> Medicines Added:</div>
+                        <div id="med-added-list-viewport"><em>No medicines added yet. Add medicines to see them here.</em></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Delivery Destination Drop-Point</label>
+                        <button class="btn btn-map-launch" onclick="launchSubPageMapPicker('medicine')"><i class="fas fa-expand"></i> Choose Map in Full Screen</button>
+                        <div id="medSelectionMap" class="inline-map-box"></div>
+                        <p style="font-size: 12px; color: #555; margin-top: 5px;"><strong>Selected Delivery Vectors:</strong> Lat <span id="medLat">-</span>, Lng <span id="medLng">-</span></p>
+                    </div>
+                    
+                    <div class="form-group"><label>Recipient Full Name</label><input type="text" id="med-cust-name" placeholder="Enter recipient full name"></div>
+                    <div class="form-group"><label>Contact Phone Number</label><input type="tel" id="med-cust-phone" placeholder="Enter active mobile line"></div>
+                    
+                    <button class="btn btn-med-submit" onclick="executeMedicineOrderSubmit()"><i class="fas fa-truck-medical"></i> Submit Medicine Order</button>
+                </div>
+            </div>
+
+            <div id="view-grocery" class="page-container">
+                <div class="food-form-panel">
+                    <div id="grocery-hotline-container" class="hotline-banner">
+                        <i class="fas fa-phone-volume"></i>
+                        <span>Call Service Also Available: <a id="grocery-hotline-link" href="#" style="color:#E65100; text-decoration:underline; font-weight:bold;">-</a></span>
+                    </div>
+                    <h2 style="color: #2e7d32; margin-bottom: 20px;"><i class="fas fa-shopping-cart"></i> Quick Grocery Procurement Request</h2>
+                    
+                    <div class="grocery-mode-toggle">
+                        <button id="btn-mode-catalog" class="mode-btn active" onclick="switchGroceryInputMode('catalog')"><i class="fas fa-list"></i> Browse Catalog Stock</button>
+                        <button id="btn-mode-manual" class="mode-btn" onclick="switchGroceryInputMode('manual')"><i class="fas fa-keyboard"></i> Manual Entry Slip</button>
+                    </div>
+
+                    <div id="grocery-catalog-ui-block">
+                        <div class="form-group">
+                            <label>Browse Grocery Categories</label>
+                            <div class="category-container">
+                                <div class="category-card selected" id="catVeggies" onclick="selectGroceryCategory('veggies')">
+                                    <div class="category-icon">🍎</div>Fruits & Veggies
+                                </div>
+                                <div class="category-card" id="catDairy" onclick="selectGroceryCategory('dairy')">
+                                    <div class="category-icon">🥛</div>Dairy & Eggs
+                                </div>
+                                <div class="category-card" id="catSnacks" onclick="selectGroceryCategory('snacks')">
+                                    <div class="category-icon">🍪</div>Munchies & Snacks
+                                </div>
+                                <div class="category-card" id="catStaples" onclick="selectGroceryCategory('staples')">
+                                    <div class="category-icon">🌾</div>Grains & Staples
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="med-builder-row">
+                            <div class="med-builder-col wide">
+                                <label>Select Product Item from Catalog</label>
+                                <select id="groceryItemSelect" style="width: 100%; padding: 14px; border: 1px solid #ccc; border-radius: 8px;"></select>
+                            </div>
+                            <div class="med-builder-col">
+                                <label>Quantity</label>
+                                <input type="number" id="groceryItemQty" value="1" min="1" max="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="grocery-manual-ui-block" class="hidden">
+                        <div class="med-builder-row">
+                            <div class="med-builder-col wide">
+                                <label>Item Name / Description Specification</label>
+                                <input type="text" id="grocery-manual-name" placeholder="e.g., Local Refined Sunflower Oil 1L">
+                            </div>
+                            <div class="med-builder-col">
+                                <label>Quantity</label>
+                                <input type="number" id="grocery-manual-qty" value="1" min="1" max="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-confirm-med" style="background-color: #2e7d32;" onclick="executeLocalGroceryItemConfirm()"><i class="fas fa-cart-plus"></i> Add Item to Basket</button>
+
+                    <div class="med-manifest-box grocery-manifest-theme">
+                        <div class="med-manifest-title grocery-manifest-theme"><i class="fas fa-basket-shopping"></i> Current Basket Inventory Preview:</div>
+                        <div id="grocery-added-list-viewport"><em>Your basket is currently empty. Choose fields and add products above.</em></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Delivery Destination Drop-Point</label>
+                        <button class="btn btn-map-launch" onclick="launchSubPageMapPicker('grocery')"><i class="fas fa-expand"></i> Choose Map in Full Screen</button>
+                        <div id="grocerySelectionMap" class="inline-map-box"></div>
+                        <p style="font-size: 12px; color: #555; margin-top: 5px;"><strong>Selected Delivery Vectors:</strong> Lat <span id="groceryLat">-</span>, Lng <span id="groceryLng">-</span></p>
+                    </div>
+
+                    <div class="form-group"><label>Your Full Name</label><input type="text" id="grocery-cust-name" placeholder="Enter recipient full name"></div>
+                    <div class="form-group"><label>Contact Phone Number</label><input type="tel" id="grocery-cust-phone" placeholder="Enter contact mobile number"></div>
+                    <div class="form-group"><label>Delivery Notes / Specific Landmark</label><textarea id="grocery-cust-notes" rows="3" placeholder="Apartment numbers, gate codes, landmarks..."></textarea></div>
+
+                    <button class="btn-grocery-submit" onclick="executeGroceryOrderSubmit()"><i class="fas fa-truck-ramp-box"></i> Submit Grocery Order</button>
+                </div>
+            </div>
+
+            <div id="view-parcel" class="page-container">
+                <div class="food-form-panel">
+                    <div id="parcel-hotline-container" class="hotline-banner">
+                        <i class="fas fa-phone-volume"></i>
+                        <span>Call Service Also Available: <a id="parcel-hotline-link" href="#" style="color:#E65100; text-decoration:underline; font-weight:bold;">-</a></span>
+                    </div>
+                    <h2 style="color: #9c27b0; margin-bottom: 20px;"><i class="fas fa-box"></i> Express Parcel Delivery Pipeline</h2>
+                    
+                    <div class="form-group">
+                        <label>Parcel Structural Dimensions</label>
+                        <select id="parcel-size-select" onchange="adjustParcelVehicleOptions()">
+                            <option value="small">Small Package (Fits inside standard carrier backpack)</option>
+                            <option value="large">Large Cargo (Requires heavier freight chassis)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Select Delivery Logistics Vehicle Fleet</label>
+                        <select id="parcel-vehicle-select"></select>
+                    </div>
+
+                    <div class="form-group"><label>Sender/Recipient Full Name</label><input type="text" id="parcel-cust-name" placeholder="Enter full name parameter"></div>
+                    <div class="form-group"><label>Operational Contact Mobile Number</label><input type="tel" id="parcel-cust-phone" placeholder="Enter active phone line"></div>
+
+                    <div class="med-builder-row">
+                        <div class="med-builder-col">
+                            <label>Geographic Pickup Coordinate Node</label>
+                            <button class="btn btn-map-launch" onclick="launchFullscreenMapPicker('pickup')"><i class="fas fa-map-marker-alt"></i> Set Pinpoint Pickup Map Location</button>
+                            <p style="font-size:12px; color:#555;">Vectors: Lat <span id="txtParcelPickLat">-</span>, Lng <span id="txtParcelPickLng">-</span></p>
+                        </div>
+                        <div class="med-builder-col">
+                            <label>Geographic Delivery Destination Node</label>
+                            <button class="btn btn-map-launch" onclick="launchFullscreenMapPicker('delivery')"><i class="fas fa-map-pin"></i> Set Pinpoint Delivery Map Location</button>
+                            <p style="font-size:12px; color:#555;">Vectors: Lat <span id="txtParcelDropLat">-</span>, Lng <span id="txtParcelDropLng">-</span></p>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Detailed Text Address (Pickup Spot Line)</label>
+                        <input type="text" id="parcel-pickup-text-address" placeholder="Flat, Building, Street Info here...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Detailed Text Address (Delivery Spot Line)</label>
+                        <input type="text" id="parcel-delivery-text-address" placeholder="Destination landmarks, house code...">
+                    </div>
+
+                    <button class="btn btn-primary" style="background:linear-gradient(135deg, #9c27b0, #7b1fa2);" onclick="executeParcelOrderSubmit()"><i class="fas fa-paper-plane"></i> Dispatch Express Freight Request</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="locationMapModal" class="modal">
+        <div class="modal-content map-modal-content">
+            <div class="modal-header"><h2>📍 Precision Geographic Location Map</h2><span class="close" onclick="closeModal('locationMapModal')">&times;</span></div>
+            <div id="mapContainer"></div>
+            <div class="location-info">
+                <p><strong>Exact Location Address Name:</strong> <span id="modalAddress">Fetching precise parameters...</span></p>
+                <p><strong>Lat / Lng Vectors:</strong> <span id="modalLat">-</span> , <span id="modalLng">-</span></p>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="updateLocationGPS()">🔄 Sync Live Coordinates</button>
+                <button class="btn btn-secondary" onclick="closeModal('locationMapModal')">Close Window</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fullscreenPickerModal" class="modal">
+        <div class="modal-content map-modal-content" style="max-width:850px;">
+            <div class="modal-header"><h2 id="pickerModalHeadingTitle">Interactive System Geolocation Node Picker</h2><span class="close" onclick="closeModal('fullscreenPickerModal')">&times;</span></div>
+            <div id="fullscreenPickMapContainer"></div>
+            <div class="location-info"><p>Selected Mapping Coordinate Position Vector: <b id="lblPickerLatStr">-</b>, <b id="lblPickerLngStr">-</b></p></div>
+            <button class="btn btn-primary" onclick="confirmFullscreenPickedCoordinates()">Apply Vector Coordinates</button>
+        </div>
+    </div>
+
+    <div id="trackOrderModal" class="modal">
+        <div class="modal-content map-modal-content">
+            <div class="modal-header"><h2>Active Order Tracking Console</h2><span class="close" onclick="closeModal('trackOrderModal')">&times;</span></div>
+            <div id="trackingMapContainer"></div>
+            <button class="btn btn-secondary" onclick="closeModal('trackOrderModal')">Terminate View</button>
+        </div>
+    </div>
+
+    <!-- Premium Profile Modal View Layout -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content" style="border-radius: 24px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.15);">
+            <div class="modal-header" style="border-bottom: none; margin-bottom: 10px;">
+                <h2 style="font-weight: 800; letter-spacing: -0.5px; color: #1e293b;">My Profile</h2>
+                <span class="close" onclick="closeModal('profileModal')">&times;</span>
+            </div>
+            
+            <div class="premium-profile-card">
+                <div class="premium-profile-header">
+                    <div class="premium-profile-badge-avatar" id="premiumUserAvatarInitial">-</div>
+                    <h3 id="premiumUserProfileName" style="color:#1e293b; font-size: 20px; font-weight: 700; margin-bottom: 4px;">User Account</h3>
+                    <span class="premium-profile-tier"><i class="fas fa-crown"></i> QHP Premium Member</span>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-user" style="color: #0D47A1; margin-right: 4px;"></i> Full Identity Name</label>
+                    <input type="text" id="prof-name" readonly>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-envelope" style="color: #2962ff; margin-right: 4px;"></i> Communications Email Address</label>
+                    <input type="text" id="prof-email" readonly>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-phone" style="color: #2e7d32; margin-right: 4px;"></i> Active Contact Line</label>
+                    <input type="text" id="prof-phone" readonly>
+                </div>
+            </div>
+            
+            <div class="profile-btn-group" id="profile-view-buttons">
+                <button class="btn btn-primary" onclick="enableProfileEditing()"><i class="fas fa-edit"></i> Edit Profile</button>
+                <button class="btn btn-secondary-flat" onclick="closeModal('profileModal')"><i class="fas fa-arrow-left"></i> Close Panel</button>
+                <button class="btn btn-danger-modern" onclick="logoutSystem()"><i class="fas fa-sign-out-alt"></i> Logout Account</button>
+            </div>
+            <div class="profile-btn-group hidden" id="profile-edit-buttons">
+                <button class="btn btn-primary" style="background:#2e7d32;" onclick="saveEditedProfile()"><i class="fas fa-save"></i> Save Changes</button>
+                <button class="btn btn-secondary-flat" onclick="disableProfileEditing()"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, child, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEMuw60DEiC1WDRdQ5vslBKS8LimB_Uj0",
+            authDomain: "studyhub-33164.firebaseapp.com",
+            databaseURL: "https://studyhub-33164-default-rtdb.firebaseio.com",
+            projectId: "studyhub-33164",
+            storageBucket: "studyhub-33164.firebasestorage.app",
+            messagingSenderId: "918352715015",
+            appId: "1:918352715015:web:f92d94cb0ac679d432b9a2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        // Initializing with Public Key
+        emailjs.init({ publicKey: "6OYyhfesYKGExGDPb" });
+
+        let dynamicGeneratedOTP = null, registrationCache = {}, currentUserSession = null;
+        let userLat = 12.9716, userLng = 77.5946, map = null, userMarker = null;
+        let foodMapInstance = null, foodMapMarker = null, finalSelectedFoodLat = null, finalSelectedFoodLng = null;
+        let medMapInstance = null, medMapMarker = null, finalSelectedMedLat = null, finalSelectedMedLng = null;
+        let groceryMapInstance = null, groceryMapMarker = null, finalSelectedGroceryLat = null, finalSelectedGroceryLng = null;
+        let liveTrackingIntervalReference = null, liveTrackingMapInstance = null, mapTrackingAgentMarker = null, mapTrackingUserHomeMarker = null;
+        
+        let localMedicinesCollection = [];
+        let localGroceryCollection = [];
+        let activeGroceryInputMode = "catalog";
+
+        const groceryCatalogDatabase = {
+            veggies: ["Fresh Red Apples (1kg)", "Organic Bananas (1 Dozen)", "Potatoes (2kg Bulk)", "Fresh Tomatoes (500g)", "Spinach Bunch"],
+            dairy: ["Whole Milk (1L Tetrapak)", "Salted Butter (200g)", "Fresh Paneer/Cottage Cheese (250g)", "Large Brown Eggs (12pk)", "Greek Yogurt (500g)"],
+            snacks: ["Salted Potato Wafers", "Chocolate Chip Cookies", "Roasted Almonds (200g)", "Cheese Corn Puffs", "Instant Noodles Pack"],
+            staples: ["Basmati Rice (5kg Premium)", "Whole Wheat Atta Flour (5kg)", "Red Lentils/Masoor Dal (1kg)", "Sunflower Cooking Oil (1L)", "Refined Sugar (1kg)"]
+        };
+
+        let parcelPickerTargetType = null;
+        let pickerMapInstance = null, pickerMapMarker = null;
+        let finalParcelPickLat = null, finalParcelPickLng = null;
+        let finalParcelDropLat = null, finalParcelDropLng = null;
+        let temporaryLat = null, temporaryLng = null;
+
+        window.showCustomAlert = function(msgText, isError = false) {
+            const overlay = document.getElementById('qhp-custom-alert');
+            const text = document.getElementById('qhp-alert-text');
+            const icon = document.getElementById('qhp-alert-icon');
+            text.textContent = msgText;
+            icon.className = isError ? "fas fa-circle-xmark error-icon" : "fas fa-circle-check info-icon";
+            overlay.style.display = "flex";
+        }
+        window.dismissCustomAlert = function() { document.getElementById('qhp-custom-alert').style.display = "none"; }
+
+        window.toggleSidebar = function(e) {
+            if(e) e.stopPropagation();
+            const sidebar = document.getElementById('sidebar');
+            const logo = document.getElementById('sidebarLogo');
+            sidebar.classList.toggle('expanded');
+            if(window.innerWidth > 768) logo.classList.toggle('show');
+
+            if(sidebar.classList.contains('expanded')) {
+                pushRoutingState('menu');
+            }
+        }
+
+        window.handleGlobalClick = function(e) {
+            const sidebar = document.getElementById('sidebar');
+            if(sidebar.classList.contains('expanded')) {
+                if(!sidebar.contains(e.target) && !e.target.closest('.menu-toggle')) {
+                    sidebar.classList.remove('expanded');
+                    const logo = document.getElementById('sidebarLogo');
+                    if(window.innerWidth > 768) logo.classList.remove('show');
+                }
+            }
+        }
+
+        window.toggleAuthWindows = function(showSignUp) {
+            if(showSignUp) {
+                document.getElementById('signup-window').classList.remove('hidden');
+                document.getElementById('login-window').classList.add('hidden');
+            } else {
+                document.getElementById('signup-window').classList.add('hidden');
+                document.getElementById('login-window').classList.remove('hidden');
+            }
+        }
+
+        function createOTP() { return Math.floor(100000 + Math.random() * 900000).toString(); }
+        function sanitizePathKey(email) { return email.replace(/\./g, ','); }
+
+        function initHotlineListenerMatrix() {
+            onValue(ref(db, 'hotlines'), (snapshot) => {
+                const data = snapshot.val() || {};
+                
+                const fContainer = document.getElementById('food-hotline-container');
+                const fLink = document.getElementById('food-hotline-link');
+                if (data.food && data.food.trim() !== "") {
+                    fContainer.style.display = "flex"; fLink.textContent = data.food; fLink.href = "tel:" + data.food;
+                } else { fContainer.style.display = "none"; }
+
+                const mContainer = document.getElementById('medicine-hotline-container');
+                const mLink = document.getElementById('medicine-hotline-link');
+                if (data.medicine && data.medicine.trim() !== "") {
+                    mContainer.style.display = "flex"; mLink.textContent = data.medicine; mLink.href = "tel:" + data.medicine;
+                } else { mContainer.style.display = "none"; }
+
+                const gContainer = document.getElementById('grocery-hotline-container');
+                const gLink = document.getElementById('grocery-hotline-link');
+                if (data.grocery && data.grocery.trim() !== "") {
+                    gContainer.style.display = "flex"; gLink.textContent = data.grocery; gLink.href = "tel:" + data.grocery;
+                } else { gContainer.style.display = "none"; }
+
+                const pContainer = document.getElementById('parcel-hotline-container');
+                const pLink = document.getElementById('parcel-hotline-link');
+                if (data.parcel && data.parcel.trim() !== "") {
+                    pContainer.style.display = "flex"; pLink.textContent = data.parcel; pLink.href = "tel:" + data.parcel;
+                } else { pContainer.style.display = "none"; }
+            });
+        }
+        initHotlineListenerMatrix();
+
+        window.switchGroceryInputMode = function(modeKey) {
+            activeGroceryInputMode = modeKey;
+            document.getElementById('btn-mode-catalog').classList.toggle('active', modeKey === 'catalog');
+            document.getElementById('btn-mode-manual').classList.toggle('active', modeKey === 'manual');
+            
+            document.getElementById('grocery-catalog-ui-block').classList.toggle('hidden', modeKey !== 'catalog');
+            document.getElementById('grocery-manual-ui-block').classList.toggle('hidden', modeKey !== 'manual');
+        };
+
+        window.selectGroceryCategory = function(catKey) {
+            document.querySelectorAll('.category-card').forEach(card => card.classList.remove('selected'));
+            if(catKey === 'veggies') document.getElementById('catVeggies').classList.add('selected');
+            if(catKey === 'dairy') document.getElementById('catDairy').classList.add('selected');
+            if(catKey === 'snacks') document.getElementById('catSnacks').classList.add('selected');
+            if(catKey === 'staples') document.getElementById('catStaples').classList.add('selected');
+            populateGroceryDropdownItems(catKey);
+        };
+
+        function populateGroceryDropdownItems(catKey) {
+            const dropdown = document.getElementById('groceryItemSelect');
+            dropdown.innerHTML = '';
+            groceryCatalogDatabase[catKey].forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item;
+                opt.textContent = item;
+                dropdown.appendChild(opt);
+            });
+        }
+        populateGroceryDropdownItems('veggies');
+
+        window.executeLocalGroceryItemConfirm = function() {
+            let itemName = "";
+            let quantity = 0;
+
+            if (activeGroceryInputMode === "catalog") {
+                itemName = document.getElementById('groceryItemSelect').value;
+                quantity = parseInt(document.getElementById('groceryItemQty').value);
+                document.getElementById('groceryItemQty').value = "1";
+            } else {
+                itemName = document.getElementById('grocery-manual-name').value.trim();
+                quantity = parseInt(document.getElementById('grocery-manual-qty').value);
+                if(!itemName) return showCustomAlert("Please specify the item description parameters.", true);
+                
+                document.getElementById('grocery-manual-name').value = "";
+                document.getElementById('grocery-manual-qty').value = "1";
+            }
+
+            if(!itemName || quantity < 1) return showCustomAlert("Specify a valid item state selection.", true);
+
+            const existingIdx = localGroceryCollection.findIndex(i => i.name === itemName);
+            if(existingIdx > -1) {
+                localGroceryCollection[existingIdx].qty += quantity;
+            } else {
+                localGroceryCollection.push({ name: itemName, qty: quantity });
+            }
+            renderLocalGroceryListViewport();
+        };
+
+        window.removeLocalGroceryItemIndex = function(index) {
+            localGroceryCollection.splice(index, 1);
+            renderLocalGroceryListViewport();
+        };
+
+        function renderLocalGroceryListViewport() {
+            const wrapper = document.getElementById('grocery-added-list-viewport');
+            if(localGroceryCollection.length === 0) {
+                wrapper.innerHTML = `<em>Your basket is currently empty. Choose fields and add products above.</em>`;
+                return;
+            }
+            let htmlStr = "";
+            localGroceryCollection.forEach((item, index) => {
+                htmlStr += `
+                    <div class="med-item-chip">
+                        <span><strong>🛒 ${item.name}</strong> - Qty: ${item.qty}</span>
+                        <button class="btn-delete-chip" onclick="removeLocalGroceryItemIndex(${index})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+            });
+            wrapper.innerHTML = htmlStr;
+        }
+
+        window.executeGroceryOrderSubmit = function() {
+            const custName = document.getElementById('grocery-cust-name').value.trim();
+            const custPhone = document.getElementById('grocery-cust-phone').value.trim();
+            const notes = document.getElementById('grocery-cust-notes').value.trim();
+
+            if(localGroceryCollection.length === 0) return showCustomAlert("Basket is completely empty.", true);
+            if(!custName || !custPhone || !notes) return showCustomAlert("Fill out all required customer forms.", true);
+
+            let compiledSummary = localGroceryCollection.map(g => `${g.name} x${g.qty}`).join(", ");
+            const oId = "QHP" + Math.floor(100000 + Math.random() * 900000);
+            
+            const payload = {
+                orderId: oId, orderType: "Grocery", userEmail: currentUserSession.email, userName: custName, userPhone: custPhone,
+                restaurant: "Local Supermarket Hub", foodItems: compiledSummary + ` (Notes: ${notes})`, deliveryLat: finalSelectedGroceryLat, deliveryLng: finalSelectedGroceryLng,
+                status: "Processing", partnerEmail: "", partnerName: "", partnerPhone: "", timestamp: Date.now()
+            };
+
+            set(ref(db, 'orders/' + oId), payload).then(() => {
+                showCustomAlert(`Grocery payload created successfully! ID: ${oId}`);
+                localGroceryCollection = [];
+                renderLocalGroceryListViewport();
+                document.getElementById('grocery-cust-name').value = '';
+                document.getElementById('grocery-cust-phone').value = '';
+                document.getElementById('grocery-cust-notes').value = '';
+                navigateTo('dashboard');
+            });
+        };
+
+        window.adjustParcelVehicleOptions = function() {
+            const size = document.getElementById('parcel-size-select').value;
+            const container = document.getElementById('parcel-vehicle-select');
+            if(size === "small") {
+                container.innerHTML = `<option value="Bike">Standard Two-Wheeler Bike</option>`;
+            } else {
+                container.innerHTML = `
+                    <option value="Auto">Three-Wheeler Commercial Auto</option>
+                    <option value="Mini Truck">Payload Tata Ace Mini Truck</option>
+                    <option value="Cargo Truck">Heavy Operational Cargo Truck</option>`;
+            }
+        }
+        window.adjustParcelVehicleOptions();
+
+        window.launchFullscreenMapPicker = function(mode) {
+            parcelPickerTargetType = mode; 
+            document.getElementById('pickerModalHeadingTitle').innerText = mode === "pickup" ? "Select Pinpoint Source Pickup Position Node" : "Select Pinpoint Destination Target Delivery Node";
+            document.getElementById('fullscreenPickerModal').classList.add('show');
+            
+            temporaryLat = userLat; 
+            temporaryLng = userLng;
+            document.getElementById('lblPickerLatStr').textContent = temporaryLat.toFixed(5);
+            document.getElementById('lblPickerLngStr').textContent = temporaryLng.toFixed(5);
+
+            setTimeout(() => {
+                if(!pickerMapInstance) {
+                    pickerMapInstance = L.map('fullscreenPickMapContainer').setView([userLat, userLng], 14);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickerMapInstance);
+                    pickerMapMarker = L.marker([userLat, userLng], { draggable: true }).addTo(pickerMapInstance);
+                    
+                    const synchronizeLabels = (latlng) => {
+                        temporaryLat = latlng.lat; 
+                        temporaryLng = latlng.lng;
+                        document.getElementById('lblPickerLatStr').textContent = temporaryLat.toFixed(5);
+                        document.getElementById('lblPickerLngStr').textContent = temporaryLng.toFixed(5);
+                    };
+
+                    pickerMapInstance.on('click', e => {
+                        pickerMapMarker.setLatLng(e.latlng);
+                        synchronizeLabels(e.latlng);
+                    });
+                    pickerMapInstance.on('dragend', e => {
+                        synchronizeLabels(e.target.getLatLng());
+                    });
+                } else {
+                    pickerMapInstance.setView([userLat, userLng], 14);
+                    pickerMapMarker.setLatLng([userLat, userLng]);
+                }
+                pickerMapInstance.invalidateSize();
+            }, 250);
+        };
+
+        window.launchSubPageMapPicker = function(subPageName) {
+            parcelPickerTargetType = subPageName; 
+            document.getElementById('pickerModalHeadingTitle').innerText = `Select Precision Delivery Location Target`;
+            document.getElementById('fullscreenPickerModal').classList.add('show');
+            
+            let currentLat = userLat;
+            let currentLng = userLng;
+
+            if (subPageName === 'food' && finalSelectedFoodLat) { currentLat = finalSelectedFoodLat; currentLng = finalSelectedFoodLng; }
+            if (subPageName === 'medicine' && finalSelectedMedLat) { currentLat = finalSelectedMedLat; currentLng = finalSelectedMedLng; }
+            if (subPageName === 'grocery' && finalSelectedGroceryLat) { currentLat = finalSelectedGroceryLat; currentLng = finalSelectedGroceryLng; }
+
+            temporaryLat = currentLat; 
+            temporaryLng = currentLng;
+            document.getElementById('lblPickerLatStr').textContent = temporaryLat.toFixed(5);
+            document.getElementById('lblPickerLngStr').textContent = temporaryLng.toFixed(5);
+
+            setTimeout(() => {
+                if(!pickerMapInstance) {
+                    pickerMapInstance = L.map('fullscreenPickMapContainer').setView([currentLat, currentLng], 14);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(pickerMapInstance);
+                    pickerMapMarker = L.marker([currentLat, currentLng], { draggable: true }).addTo(pickerMapInstance);
+                    
+                    const synchronizeLabels = (latlng) => {
+                        temporaryLat = latlng.lat; 
+                        temporaryLng = latlng.lng;
+                        document.getElementById('lblPickerLatStr').textContent = temporaryLat.toFixed(5);
+                        document.getElementById('lblPickerLngStr').textContent = temporaryLng.toFixed(5);
+                    };
+
+                    pickerMapInstance.on('click', e => {
+                        pickerMapMarker.setLatLng(e.latlng);
+                        synchronizeLabels(e.latlng);
+                    });
+                    pickerMapInstance.on('dragend', e => {
+                        synchronizeLabels(e.target.getLatLng());
+                    });
+                } else {
+                    pickerMapInstance.setView([currentLat, currentLng], 14);
+                    pickerMapMarker.setLatLng([currentLat, currentLng]);
+                }
+                pickerMapInstance.invalidateSize();
+            }, 250);
+        }
+
+        window.confirmFullscreenPickedCoordinates = function() {
+            if(parcelPickerTargetType === "pickup") {
+                finalParcelPickLat = temporaryLat; 
+                finalParcelPickLng = temporaryLng;
+                document.getElementById('txtParcelPickLat').textContent = finalParcelPickLat.toFixed(5);
+                document.getElementById('txtParcelPickLng').textContent = finalParcelPickLng.toFixed(5);
+            } else if(parcelPickerTargetType === "delivery") {
+                finalParcelDropLat = temporaryLat; 
+                finalParcelDropLng = temporaryLng;
+                document.getElementById('txtParcelDropLat').textContent = finalParcelDropLat.toFixed(5);
+                document.getElementById('txtParcelDropLng').textContent = finalParcelDropLat.toFixed(5);
+            } else if(parcelPickerTargetType === "food") {
+                finalSelectedFoodLat = temporaryLat;
+                finalSelectedFoodLng = temporaryLng;
+                document.getElementById('foodLat').textContent = finalSelectedFoodLat.toFixed(5);
+                document.getElementById('foodLng').textContent = finalSelectedFoodLng.toFixed(5);
+                if (foodMapMarker) foodMapMarker.setLatLng([finalSelectedFoodLat, finalSelectedFoodLng]);
+                if (foodMapInstance) foodMapInstance.setView([finalSelectedFoodLat, finalSelectedFoodLng], 14);
+            } else if(parcelPickerTargetType === "medicine") {
+                finalSelectedMedLat = temporaryLat;
+                finalSelectedMedLng = temporaryLng;
+                document.getElementById('medLat').textContent = finalSelectedMedLat.toFixed(5);
+                document.getElementById('medLng').textContent = finalSelectedMedLng.toFixed(5);
+                if (medMapMarker) medMapMarker.setLatLng([finalSelectedMedLat, finalSelectedMedLng]);
+                if (medMapInstance) medMapInstance.setView([finalSelectedMedLat, finalSelectedMedLng], 14);
+            } else if(parcelPickerTargetType === "grocery") {
+                finalSelectedGroceryLat = temporaryLat;
+                finalSelectedGroceryLng = temporaryLng;
+                document.getElementById('groceryLat').textContent = finalSelectedGroceryLat.toFixed(5);
+                document.getElementById('groceryLng').textContent = finalSelectedGroceryLng.toFixed(5);
+                if (groceryMapMarker) groceryMapMarker.setLatLng([finalSelectedGroceryLat, finalSelectedGroceryLng]);
+                if (groceryMapInstance) groceryMapInstance.setView([finalSelectedGroceryLat, finalSelectedGroceryLng], 14);
+            }
+            closeModal('fullscreenPickerModal');
+            showCustomAlert("Geographic node mapped position successfully updated.");
+        };
+
+        window.executeParcelOrderSubmit = function() {
+            const sizeClass = document.getElementById('parcel-size-select').value;
+            const vehicle = document.getElementById('parcel-vehicle-select').value;
+            const name = document.getElementById('parcel-cust-name').value.trim();
+            const phone = document.getElementById('parcel-cust-phone').value.trim();
+            const pickText = document.getElementById('parcel-pickup-text-address').value.trim();
+            const dropText = document.getElementById('parcel-delivery-text-address').value.trim();
+
+            if(!name || !phone || !pickText || !dropText) return showCustomAlert("Please clarify all detailed input form frames.", true);
+            if(!finalParcelPickLat || !finalParcelDropLat) return showCustomAlert("Both structural location maps must map data points.", true);
+
+            const oId = "QHP" + Math.floor(100000 + Math.random() * 900000);
+            const payload = {
+                orderId: oId, orderType: "Parcel", userEmail: currentUserSession.email, userName: name, userPhone: phone,
+                restaurant: `Express Freight - [${sizeClass.toUpperCase()}]`,
+                foodItems: `Size: ${sizeClass} | Fleet Type: ${vehicle} | Start: ${pickText} | End: ${dropText}`,
+                deliveryLat: finalParcelDropLat, deliveryLng: finalParcelDropLng,
+                pickupLat: finalParcelPickLat, pickupLng: finalParcelPickLng,
+                pickupAddressText: pickText, deliveryAddressText: dropText,
+                status: "Processing", partnerEmail: "", partnerName: "", partnerPhone: "", timestamp: Date.now()
+            };
+
+            set(ref(db, 'orders/' + oId), payload).then(() => {
+                showCustomAlert(`Express parcel manifest created! ID: ${oId}`);
+                document.getElementById('parcel-pickup-text-address').value = '';
+                document.getElementById('parcel-delivery-text-address').value = '';
+                navigateTo('dashboard');
+            });
+        };
+
+        window.executeLocalMedItemConfirm = function() {
+            const name = document.getElementById('med-name-input').value.trim();
+            const dosage = document.getElementById('med-dosage-input').value.trim();
+            const qty = document.getElementById('med-qty-input').value.trim();
+            if(!name || !dosage || !qty) return showCustomAlert("Please supply details for all active fields.", true);
+
+            localMedicinesCollection.push({ name, dosage, qty });
+            document.getElementById('med-name-input').value = '';
+            document.getElementById('med-dosage-input').value = '';
+            document.getElementById('med-qty-input').value = '';
+            renderLocalMedicinesListViewport();
+        }
+
+        window.removeLocalMedItemIndex = function(index) {
+            localMedicinesCollection.splice(index, 1);
+            renderLocalMedicinesListViewport();
+        }
+
+        function renderLocalMedicinesListViewport() {
+            const view = document.getElementById('med-added-list-viewport');
+            if(localMedicinesCollection.length === 0) {
+                view.innerHTML = `<em>No medicines added yet. Add medicines to see them here.</em>`;
+                return;
+            }
+            let htmlStr = "";
+            localMedicinesCollection.forEach((item, index) => {
+                htmlStr += `
+                    <div class="med-item-chip">
+                        <span><strong>${item.name}</strong> (${item.dosage}) - Qty: ${item.qty}</span>
+                        <button class="btn-delete-chip" onclick="removeLocalMedItemIndex(${index})"><i class="fas fa-trash"></i></button>
+                    </div>`;
+            });
+            view.innerHTML = htmlStr;
+        }
+
+        window.handleSignUpSendOTP = async function() {
+            const name = document.getElementById('su-name').value.trim();
+            const email = document.getElementById('su-email').value.trim();
+            const phone = document.getElementById('su-phone').value.trim();
+            if(!name || !email || !phone) return showCustomAlert("Please fill in all details.", true);
+
+            const signupBtn = document.getElementById('btn-signup-send-otp');
+            signupBtn.disabled = true;
+            signupBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatched Code...`;
+
+            const safeKey = sanitizePathKey(email);
+            try {
+                const snapshot = await get(child(ref(db), `users/${safeKey}`));
+                if (snapshot.exists()) {
+                    signupBtn.disabled = false;
+                    signupBtn.innerText = "Send Verification OTP";
+                    return showCustomAlert("Email already registered. Please login.", true);
+                }
+            } catch (err) { console.error(err); }
+
+            dynamicGeneratedOTP = createOTP();
+            registrationCache = { fullName: name, email: email, phoneNumber: phone };
+            
+            emailjs.send("service_qh1c06y", "template_judy2gg", { email: email, otp: dynamicGeneratedOTP }).then(() => {
+                showCustomAlert("OTP sent successfully to your email address!");
+                document.getElementById('signup-form-step').classList.add('hidden');
+                document.getElementById('signup-otp-step').classList.remove('hidden');
+            }).catch((error) => {
+                signupBtn.disabled = false;
+                signupBtn.innerText = "Send Verification OTP";
+                console.error("EmailJS Sign-Up Error Details:", error);
+                showCustomAlert("Failed to send verification OTP: " + (error.text || error.message || "Provider config issue"), true);
+            });
+        }
+
+        window.handleSignUpVerifyOTP = function() {
+            if(document.getElementById('su-otp').value.trim() === dynamicGeneratedOTP) {
+                set(ref(db, 'users/' + sanitizePathKey(registrationCache.email)), registrationCache).then(() => {
+                    showCustomAlert("Account registered successfully!");
+                    initializeActiveSession(registrationCache);
+                });
+            } else showCustomAlert("Security Code Mismatch.", true);
+        }
+
+        window.handleLoginSendOTP = async function() {
+            const email = document.getElementById('li-email').value.trim();
+            if(!email) return showCustomAlert("Please enter email address.", true);
+
+            const loginBtn = document.getElementById('btn-login-send-otp');
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Checking Account...`;
+
+            try {
+                const snapshot = await get(child(ref(db), `users/${sanitizePathKey(email)}`));
+                if (snapshot.exists()) {
+                    dynamicGeneratedOTP = createOTP();
+                    registrationCache = snapshot.val();
+                    
+                    emailjs.send("service_qh1c06y", "template_judy2gg", { email: email, otp: dynamicGeneratedOTP }).then(() => {
+                        showCustomAlert("OTP sent successfully to your email address!");
+                        document.getElementById('login-form-step').classList.add('hidden');
+                        document.getElementById('login-otp-step').classList.remove('hidden');
+                    }).catch((error) => {
+                        loginBtn.disabled = false;
+                        loginBtn.innerText = "Send Secure Link OTP";
+                        console.error("EmailJS Login Error Details:", error);
+                        showCustomAlert("Failed to dispatch code via servers: " + (error.text || error.message || "Provider config issue"), true);
+                    });
+                } else {
+                    loginBtn.disabled = false;
+                    loginBtn.innerText = "Send Secure Link OTP";
+                    showCustomAlert("No account matching this email address.", true);
+                }
+            } catch(e) { 
+                loginBtn.disabled = false;
+                loginBtn.innerText = "Send Secure Link OTP";
+                showCustomAlert("Server connection error.", true); 
+            }
+        }
+
+        window.handleLoginVerifyOTP = function() {
+            if(document.getElementById('li-otp').value.trim() === dynamicGeneratedOTP) {
+                showCustomAlert("Identity verified successfully.");
+                initializeActiveSession(registrationCache);
+            } else showCustomAlert("Incorrect verification code.", true);
+        }
+
+        function initializeActiveSession(obj) {
+            currentUserSession = obj;
+            localStorage.setItem("qhp_active_user", JSON.stringify(obj));
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('userAvatarInitial').innerText = obj.fullName ? obj.fullName.charAt(0).toUpperCase() : "U";
+            triggerAutomatedGeoDetection();
+            startOrdersListenerRealtimeStreams();
+            pushRoutingState('dashboard');
+        }
+
+        window.logoutSystem = function() {
+            currentUserSession = null; localStorage.removeItem("qhp_active_user"); location.reload();
+        }
+
+        function triggerAutomatedGeoDetection() {
+            if (navigator.geolocation) {
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+                navigator.geolocation.getCurrentPosition(position => {
+                    userLat = position.coords.latitude; userLng = position.coords.longitude;
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('locationLoaderSpan').classList.add('hidden');
+                        const addr = data.address || {};
+                        const locationName = addr.suburb || addr.neighbourhood || addr.city_district || addr.town || addr.city || addr.village || "Exact Location";
+                        document.getElementById('currentAreaText').textContent = locationName;
+                        window.cachedFullAddress = data.display_name || "Location Profile Live";
+                    }).catch(() => fallbackLocationText());
+                }, () => fallbackLocationText(), options);
+            } else fallbackLocationText();
+        }
+        
+        function fallbackLocationText() {
+            document.getElementById('locationLoaderSpan').classList.add('hidden');
+            document.getElementById('currentAreaText').textContent = "Location Profile Live";
+        }
+
+        window.updateLocationGPS = function() {
+            if (navigator.geolocation) {
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+                navigator.geolocation.getCurrentPosition(pos => {
+                    userLat = pos.coords.latitude; userLng = pos.coords.longitude;
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        const addr = data.address || {};
+                        const locationName = addr.suburb || addr.neighbourhood || addr.city_district || addr.town || addr.city || addr.village || "Exact Location";
+                        document.getElementById('currentAreaText').textContent = locationName;
+                        window.cachedFullAddress = data.display_name;
+                        if(map) updateMapViewCanvas();
+                    });
+                }, null, options);
+            }
+        }
+        window.openLocationMap = function() {
+            document.getElementById('locationMapModal').classList.add('show');
+            setTimeout(() => {
+                if (!map) {
+                    map = L.map('mapContainer').setView([userLat, userLng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                }
+                updateMapViewCanvas();
+            }, 150);
+        }
+        function updateMapViewCanvas() {
+            map.setView([userLat, userLng], 15);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker([userLat, userLng]).addTo(map);
+            document.getElementById('modalLat').textContent = userLat.toFixed(5);
+            document.getElementById('modalLng').textContent = userLng.toFixed(5);
+            document.getElementById('modalAddress').textContent = window.cachedFullAddress || "Mapped Vector Location";
+        }
+
+        let isTransitioningRoutingState = false;
+
+        function pushRoutingState(targetState) {
+            isTransitioningRoutingState = true;
+            window.history.pushState({ stateName: targetState }, "", "");
+            isTransitioningRoutingState = false;
+        }
+
+        window.addEventListener('popstate', (event) => {
+            if (isTransitioningRoutingState) return;
+
+            const sidebar = document.getElementById('sidebar');
+            const logo = document.getElementById('sidebarLogo');
+
+            if (sidebar.classList.contains('expanded')) {
+                sidebar.classList.remove('expanded');
+                if (window.innerWidth > 768) logo.classList.remove('show');
+                pushRoutingState(getCurrentActivePage()); 
+                return;
+            }
+
+            if (event.state && event.state.stateName) {
+                const popToStateName = event.state.stateName;
+                if (popToStateName !== 'dashboard') {
+                    navigateTo('dashboard', false);
+                } else {
+                    navigateTo('dashboard', false);
+                }
+            } else {
+                navigateTo('dashboard', false);
+            }
+        });
+
+        function getCurrentActivePage() {
+            const activePageContainer = document.querySelector('.page-container.active-view');
+            if(activePageContainer) {
+                return activePageContainer.id.replace('view-', '');
+            }
+            return 'dashboard';
+        }
+
+        window.navigateTo = function(page, pushHistoryState = true) {
+            document.querySelectorAll('.sidebar ul li').forEach(li => li.classList.remove('active'));
+            if(document.getElementById(`nav-${page}`)) document.getElementById(`nav-${page}`).classList.add('active');
+            document.querySelectorAll('.page-container').forEach(panel => panel.classList.remove('active-view'));
+            if(document.getElementById(`view-${page}`)) document.getElementById(`view-${page}`).classList.add('active-view');
+
+            if (pushHistoryState) {
+                pushRoutingState(page);
+            }
+
+            const sidebar = document.getElementById('sidebar');
+            if(sidebar.classList.contains('expanded')) {
+                sidebar.classList.remove('expanded');
+                const logo = document.getElementById('sidebarLogo');
+                if(window.innerWidth > 768) logo.classList.remove('show');
+            }
+
+            if(page === 'food') {
+                setTimeout(() => {
+                    if (!foodMapInstance) {
+                        foodMapInstance = L.map('foodSelectionMap').setView([userLat, userLng], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(foodMapInstance);
+                        foodMapMarker = L.marker([userLat, userLng]).addTo(foodMapInstance);
+                        foodMapInstance.on('click', e => {
+                            finalSelectedFoodLat = e.latlng.lat; finalSelectedFoodLng = e.latlng.lng;
+                            foodMapMarker.setLatLng(e.latlng);
+                            document.getElementById('foodLat').textContent = finalSelectedFoodLat.toFixed(5);
+                            document.getElementById('foodLng').textContent = finalSelectedFoodLng.toFixed(5);
+                        });
+                    }
+                    finalSelectedFoodLat = userLat; finalSelectedFoodLng = userLng;
+                    document.getElementById('foodLat').textContent = userLat.toFixed(5);
+                    document.getElementById('foodLng').textContent = userLng.toFixed(5);
+                }, 200);
+            }
+
+            if(page === 'medicine') {
+                setTimeout(() => {
+                    if (!medMapInstance) {
+                        medMapInstance = L.map('medSelectionMap').setView([userLat, userLng], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(medMapInstance);
+                        medMapMarker = L.marker([userLat, userLng]).addTo(medMapInstance);
+                        medMapInstance.on('click', e => {
+                            finalSelectedMedLat = e.latlng.lat; finalSelectedMedLng = e.latlng.lng;
+                            medMapMarker.setLatLng(e.latlng);
+                            document.getElementById('medLat').textContent = finalSelectedMedLat.toFixed(5);
+                            document.getElementById('medLng').textContent = finalSelectedMedLng.toFixed(5);
+                        });
+                    }
+                    finalSelectedMedLat = userLat; finalSelectedMedLng = userLng;
+                    document.getElementById('medLat').textContent = userLat.toFixed(5);
+                    document.getElementById('medLng').textContent = userLng.toFixed(5);
+                }, 200);
+            }
+
+            if(page === 'grocery') {
+                setTimeout(() => {
+                    if (!groceryMapInstance) {
+                        groceryMapInstance = L.map('grocerySelectionMap').setView([userLat, userLng], 14);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(groceryMapInstance);
+                        groceryMapMarker = L.marker([userLat, userLng]).addTo(groceryMapInstance);
+                        groceryMapInstance.on('click', e => {
+                            finalSelectedGroceryLat = e.latlng.lat; finalSelectedGroceryLng = e.latlng.lng;
+                            groceryMapMarker.setLatLng(e.latlng);
+                            document.getElementById('groceryLat').textContent = finalSelectedGroceryLat.toFixed(5);
+                            document.getElementById('groceryLng').textContent = finalSelectedGroceryLng.toFixed(5);
+                        });
+                    }
+                    finalSelectedGroceryLat = userLat; finalSelectedGroceryLng = userLng;
+                    document.getElementById('groceryLat').textContent = userLat.toFixed(5);
+                    document.getElementById('groceryLng').textContent = userLng.toFixed(5);
+                }, 200);
+            }
+        }
+
+        window.executeFoodOrderSubmit = function() {
+            const resName = document.getElementById('food-merchant-name').value.trim();
+            const custName = document.getElementById('food-cust-name').value.trim();
+            const custPhone = document.getElementById('food-cust-phone').value.trim();
+            const desc = document.getElementById('food-cust-description').value.trim();
+            if(!resName || !custName || !custPhone || !desc) return showCustomAlert("Please complete all form boxes.", true);
+
+            const oId = "QHP" + Math.floor(100000 + Math.random() * 900000);
+            const payload = {
+                orderId: oId, orderType: "Food", userEmail: currentUserSession.email, userName: custName, userPhone: custPhone,
+                restaurant: resName, foodItems: desc, deliveryLat: finalSelectedFoodLat, deliveryLng: finalSelectedFoodLng,
+                status: "Processing", partnerEmail: "", partnerName: "", partnerPhone: "", timestamp: Date.now()
+            };
+            set(ref(db, 'orders/' + oId), payload).then(() => {
+                showCustomAlert(`Food request logged! Tracking ID: ${oId}`);
+                document.getElementById('food-merchant-name').value = ''; navigateTo('dashboard');
+            });
+        }
+
+        window.executeMedicineOrderSubmit = function() {
+            const custName = document.getElementById('med-cust-name').value.trim();
+            const custPhone = document.getElementById('med-cust-phone').value.trim();
+            
+            if(localMedicinesCollection.length === 0) return showCustomAlert("Please add at least one medicine card.", true);
+            if(!custName || !custPhone) return showCustomAlert("Please fill in customer metadata.", true);
+
+            let parsedSummary = localMedicinesCollection.map(m => `${m.name} (${m.dosage}) x ${m.qty}`).join(", ");
+            const oId = "QHP" + Math.floor(100000 + Math.random() * 900000);
+            const payload = {
+                orderId: oId, orderType: "Medicine", userEmail: currentUserSession.email, userName: custName, userPhone: custPhone,
+                restaurant: "Any Nearby Pharmacy", foodItems: parsedSummary, deliveryLat: finalSelectedMedLat, deliveryLng: finalSelectedMedLng,
+                status: "Processing", partnerEmail: "", partnerName: "", partnerPhone: "", timestamp: Date.now()
+            };
+
+            set(ref(db, 'orders/' + oId), payload).then(() => {
+                showCustomAlert(`Medicine route logged successfully! ID: ${oId}`);
+                localMedicinesCollection = [];
+                renderLocalMedicinesListViewport();
+                document.getElementById('med-cust-name').value = '';
+                document.getElementById('med-cust-phone').value = '';
+                navigateTo('dashboard');
+            }).catch(() => showCustomAlert("Database state fault.", true));
+        }
+
+        function formatTimestampToReadable(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = d.getDate();
+            const month = months[d.getMonth()];
+            const year = d.getFullYear();
+            
+            let hours = d.getHours();
+            const minutes = d.getMinutes().toString().padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            
+            return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
+        }
+
+        function startOrdersListenerRealtimeStreams() {
+            if(!currentUserSession) return;
+            onValue(ref(db, 'orders'), snapshot => {
+                const feed = document.getElementById('orders-realtime-feed');
+                let ordersArray = [];
+                
+                snapshot.forEach(child => {
+                    const o = child.val();
+                    if(o.userEmail === currentUserSession.email) {
+                        ordersArray.push(o);
+                    }
+                });
+
+                ordersArray.sort((a, b) => {
+                    const timeA = a.timestamp || 0;
+                    const timeB = b.timestamp || 0;
+                    return timeB - timeA; 
+                });
+
+                let html = "";
+                ordersArray.forEach(o => {
+                    let displayStatusText = o.status;
+                    if(o.status === "Get a call") displayStatusText = "Call Received";
+                    
+                    let statusClass = "badge-processing";
+                    let containerCardStateClass = "state-processing";
+                    
+                    if (o.status === "Confirmed") {
+                        statusClass = "badge-confirmed";
+                        containerCardStateClass = "state-confirmed";
+                    } else if (["Get a call", "Call Confirmed"].includes(o.status)) {
+                        statusClass = "badge-processing";
+                        containerCardStateClass = "state-processing";
+                    } else if (["On The Way", "On Your Doorstep"].includes(o.status)) {
+                        statusClass = "badge-transit";
+                        containerCardStateClass = "state-transit";
+                    } else if (o.status === "Delivered") {
+                        statusClass = "badge-complete";
+                        containerCardStateClass = "state-complete";
+                    }
+                    
+                    let typeEmoji = "🍔";
+                    if(o.orderType === "Medicine") typeEmoji = "💊";
+                    if(o.orderType === "Grocery") typeEmoji = "🛒";
+                    if(o.orderType === "Parcel") typeEmoji = "📦";
+                    
+                    let dynamicTrackingWidget = "";
+                    if(["On The Way", "On Your Doorstep"].includes(o.status)) {
+                        dynamicTrackingWidget = `<button class="btn-feed-track" onclick="triggerDirectAgentLiveTracking('${o.orderId}')"><i class="fas fa-crosshairs"></i> Track Live Agent</button>`;
+                    }
+
+                    let timeTrackerMarkup = "";
+                    if(o.callConfirmedTime) {
+                        let confTimeStr = new Date(o.callConfirmedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                        timeTrackerMarkup += `<div><b>Call Confirmed At:</b> ${confTimeStr}</div>`;
+                    }
+                    if(o.doorstepTime && o.callConfirmedTime) {
+                        let spentMinutes = Math.floor((o.doorstepTime - o.callConfirmedTime) / (1000 * 60));
+                        timeTrackerMarkup += `<div style="color:#b91c1c; font-weight:bold;"><b>Transit Duration:</b> ${spentMinutes} mins spent total</div>`;
+                    }
+                    if(o.status === "Delivered" && o.deliveryTimeMetrics) {
+                        let delTimeStr = new Date(o.deliveryTimeMetrics).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                        timeTrackerMarkup += `<div><b>Delivered Handover At:</b> ${delTimeStr}</div>`;
+                    }
+
+                    if(timeTrackerMarkup !== "") {
+                        timeTrackerMarkup = `<div class="time-tracker-box">${timeTrackerMarkup}</div>`;
+                    }
+
+                    let formattedOrderDate = o.timestamp ? formatTimestampToReadable(o.timestamp) : 'Recent Delivery Entry';
+
+                    html += `
+                        <div class="premium-order-card ${containerCardStateClass}">
+                            <div class="order-main-body">
+                                <div class="order-header-line">
+                                    <span class="order-id-tag">#${o.orderId}</span>
+                                    <span class="order-type-chip">${typeEmoji} ${o.orderType || 'Food'}</span>
+                                    <span class="order-date-label"><i class="far fa-clock"></i> ${formattedOrderDate}</span>
+                                </div>
+                                <div class="order-vendor"><i class="fas fa-store" style="font-size:12px; margin-right:4px;"></i> ${o.restaurant}</div>
+                                <div class="order-details-text">${o.foodItems}</div>
+                                <div class="order-driver-meta">
+                                    <i class="fas fa-motorcycle"></i> 
+                                    <span>${o.partnerName ? `${o.partnerName} (${o.partnerPhone})` : 'Awaiting dispatch assignment...'}</span>
+                                </div>
+                                ${timeTrackerMarkup}
+                            </div>
+                            <div class="order-action-aside">
+                                <span class="premium-status-badge ${statusClass}">${displayStatusText}</span>
+                                ${dynamicTrackingWidget}
+                            </div>
+                        </div>`;
+                });
+                
+                feed.innerHTML = ordersArray.length > 0 ? html : `<p style="color:#888;">No active entry history logs generated.</p>`;
+            });
+        }
+
+        // Fixed real-time map listener execution sandbox callback error
+        window.triggerDirectAgentLiveTracking = function(orderId) {
+            document.getElementById('trackOrderModal').classList.add('show');
+            if(liveTrackingIntervalReference) clearInterval(liveTrackingIntervalReference);
+
+            liveTrackingIntervalReference = setInterval(() => {
+                get(child(ref(db), `orders/${orderId}`)).then(snapshot => {
+                    if(snapshot.exists()) {
+                        const o = snapshot.val();
+                        if(["On The Way", "On Your Doorstep"].includes(o.status)) {
+                            get(child(ref(db), `partners/${sanitizePathKey(o.partnerEmail)}`)).then(pSnap => {
+                                if(pSnap.exists()) {
+                                    const p = pSnap.val();
+                                    if(!liveTrackingMapInstance) {
+                                        liveTrackingMapInstance = L.map('trackingMapContainer').setView([p.lat, p.lng], 15);
+                                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(liveTrackingMapInstance);
+                                        
+                                        const partnerStyleMarkerIcon = L.divIcon({ html: `<div style="background:#0D47A1; width:16px; height:16px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 6px rgba(13,71,161,0.5);"></div>` });
+                                        mapTrackingAgentMarker = L.marker([p.lat, p.lng], {icon: partnerStyleMarkerIcon}).addTo(liveTrackingMapInstance).bindPopup("<b style='color:#0D47A1;'>Delivery Partner Driver Profile Line</b>").openPopup();
+                                        
+                                        const customerStyleMarkerIcon = L.divIcon({ html: `<div style="background:#9c27b0; width:16px; height:16px; border-radius:50%; border:3px solid #fff; box-shadow:0 0 6px rgba(156,39,176,0.5);"></div>` });
+                                        mapTrackingUserHomeMarker = L.marker([o.deliveryLat, o.deliveryLng], {icon: customerStyleMarkerIcon}).addTo(liveTrackingMapInstance).bindPopup("<b style='color:#9c27b0;'>Destination Drop Vector</b>");
+                                    } else {
+                                        mapTrackingAgentMarker.setLatLng([p.lat, p.lng]);
+                                        liveTrackingMapInstance.setView([p.lat, p.lng], 15);
+                                    }
+                                }
+                            });
+                        } else {
+                            showCustomAlert(`Rider tracking closed. Status: ${o.status}`);
+                            closeModal('trackOrderModal');
+                        }
+                    }
+                });
+            }, 3000);
+        }
+
+        window.openProfile = function() {
+            if(!currentUserSession) return;
+            document.getElementById('prof-name').value = currentUserSession.fullName || "";
+            document.getElementById('prof-email').value = currentUserSession.email || "";
+            document.getElementById('prof-phone').value = currentUserSession.phoneNumber || "";
+            
+            document.getElementById('userAvatarInitial').innerText = currentUserSession.fullName ? currentUserSession.fullName.charAt(0).toUpperCase() : "U";
+            document.getElementById('premiumUserAvatarInitial').innerText = currentUserSession.fullName ? currentUserSession.fullName.charAt(0).toUpperCase() : "U";
+            document.getElementById('premiumUserProfileName').innerText = currentUserSession.fullName || "User Account";
+            
+            disableProfileEditing();
+            document.getElementById('profileModal').classList.add('show');
+        }
+
+        window.enableProfileEditing = function() {
+            document.getElementById('prof-name').removeAttribute('readonly');
+            document.getElementById('prof-phone').removeAttribute('readonly');
+            document.getElementById('profile-view-buttons').classList.add('hidden');
+            document.getElementById('profile-edit-buttons').classList.remove('hidden');
+        }
+
+        window.disableProfileEditing = function() {
+            document.getElementById('prof-name').setAttribute('readonly', 'true');
+            document.getElementById('prof-phone').setAttribute('readonly', 'true');
+            
+            if(currentUserSession) {
+                document.getElementById('prof-name').value = currentUserSession.fullName || "";
+                document.getElementById('prof-phone').value = currentUserSession.phoneNumber || "";
+            }
+            
+            document.getElementById('profile-view-buttons').classList.remove('hidden');
+            document.getElementById('profile-edit-buttons').classList.add('hidden');
+        }
+
+        window.saveEditedProfile = function() {
+            const newName = document.getElementById('prof-name').value.trim();
+            const newPhone = document.getElementById('prof-phone').value.trim();
+
+            if(!newName || !newPhone) {
+                return showCustomAlert("Fields cannot be saved empty.", true);
+            }
+
+            const userRef = ref(db, 'users/' + sanitizePathKey(currentUserSession.email));
+            const updates = {
+                fullName: newName,
+                phoneNumber: newPhone
+            };
+
+            update(userRef, updates).then(() => {
+                currentUserSession.fullName = newName;
+                currentUserSession.phoneNumber = newPhone;
+                localStorage.setItem("qhp_active_user", JSON.stringify(currentUserSession));
+
+                document.getElementById('userAvatarInitial').innerText = newName.charAt(0).toUpperCase();
+                document.getElementById('premiumUserAvatarInitial').innerText = newName.charAt(0).toUpperCase();
+                document.getElementById('premiumUserProfileName').innerText = newName;
+                
+                showCustomAlert("Profile updated successfully!");
+                disableProfileEditing();
+            }).catch(err => {
+                console.error(err);
+                showCustomAlert("Error saving updates to profile.", true);
+            });
+        }
+
+        window.closeModal = function(id) { 
+            document.getElementById(id).classList.remove('show'); 
+            if(id === 'trackOrderModal' && liveTrackingIntervalReference) {
+                clearInterval(liveTrackingIntervalReference);
+                liveTrackingMapInstance = null;
+            } 
+        }
+
+        window.onclick = function(e) {
+            ['trackOrderModal', 'profileModal', 'locationMapModal', 'fullscreenPickerModal'].forEach(mId => {
+                if (e.target === document.getElementById(mId)) closeModal(mId);
+            });
+        }
+
+        window.addEventListener('load', () => {
+            const savedUser = localStorage.getItem("qhp_active_user");
+            if (savedUser) {
+                initializeActiveSession(JSON.parse(savedUser));
+            }
+        });
+    </script>
+</body>
+</html>
