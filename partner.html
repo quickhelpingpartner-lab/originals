@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QHP Partner Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- OpenLayers Stylesheet -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v8.2.0/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:Arial,sans-serif; }
+        body { background:#f4f7fb; display:flex; min-height: 100vh; overflow-x: hidden; }
+        
+        #auth-container {
+            position: fixed; top:0; left:0; width:100%; height:100%; 
+            background:#f4f7fb; z-index: 9999; display: flex; justify-content: center; align-items: center;
+            overflow-y: auto; padding: 20px;
+        }
+        .auth-card {
+            background: #fff; padding: 40px; border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 100%; max-width: 460px;
+        }
+        .auth-title { font-size: 28px; font-weight: bold; color: #0D47A1; margin-bottom: 8px; text-align: center;}
+        .auth-title span { color: #FF9800; }
+        .auth-subtitle { color: #666; text-align: center; margin-bottom: 24px; font-size: 14px; }
+        .auth-toggle-text { text-align: center; margin-top: 16px; font-size: 14px; color: #555; }
+        .auth-toggle-text span { color: #0D47A1; cursor: pointer; font-weight: bold; }
+        
+        .sidebar { 
+            width:70px; height:100vh; background:#fff; padding:20px 0; 
+            box-shadow:2px 0 10px rgba(0,0,0,.08); position:fixed; left:0; top:0;
+            display:flex; flex-direction:column; align-items:center;
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index:3000; overflow-y:auto;
+        }
+        .sidebar.expanded { width:250px; align-items:flex-start; padding:20px; }
+        .logo { font-size:24px; font-weight:bold; color:#0D47A1; margin-bottom:30px; display:none; }
+        .logo.show { display:block; }
+        .logo span { color:#FF9800; }
+        
+        .menu-toggle {
+            background:none; border:none; font-size:24px; color:#0D47A1;
+            cursor:pointer; margin-bottom:30px; transition:0.3s;
+        }
+        .menu-toggle:hover { transform:scale(1.1); }
+        .sidebar ul { list-style:none; width:100%; }
+        .sidebar li { 
+            padding:14px; border-radius:10px; margin-bottom:8px; cursor:pointer; 
+            transition:.3s; text-align:center; position:relative; color: #555; white-space: nowrap;
+        }
+        .sidebar.expanded li { text-align:left; width: 100%; }
+        .sidebar li:hover, .sidebar li.active { background:#eaf2ff; color:#0D47A1; font-weight:bold; }
+        .sidebar li span { display:none; }
+        .sidebar.expanded li span { display:inline; margin-left:10px; }
+        .sidebar li i { font-size:20px; }
+        
+        .main { flex:1; padding:0; overflow-y:auto; margin-left:70px; transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); width: calc(100% - 70px); }
+        .sidebar.expanded ~ .main { margin-left:250px; width: calc(100% - 250px); }
+        .content { padding:25px; }
+        
+        .topbar { display:flex; justify-content: space-between; align-items:center; margin-bottom:30px; gap:15px; width: 100%; }
+        .topbar-left { display: flex; align-items: center; }
+        .topbar-left .menu-toggle { display: none; }
+        .topbar-company-title { font-size: 22px; font-weight: bold; color: #0D47A1; }
+        .topbar-company-title span { color: #FF9800; }
+        .profile { display:flex; align-items:center; gap:10px; cursor:pointer; }
+        
+        .verification-badge { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:bold; padding:6px 12px; border-radius:20px; background:#e8f5e9; color:#2e7d32; border:1px solid #c8e6c9; }
+        .verification-badge.unverified-state { background:#fff3e0; color:#ef6c00; border-color:#ffe0b2; }
+        
+        .profile-avatar-circle { width: 46px; height: 46px; border-radius: 50%; background-color: #0D47A1; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; text-transform: uppercase; box-shadow: 0 2px 8px rgba(13,71,161,0.2); }
+        
+        .lock-warning-card { background:#fff3e0; padding:25px; border-radius:12px; border-left:6px solid #ef6c00; margin-bottom:20px; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,0.02); }
+        .lock-warning-card i { font-size:40px; color:#ef6c00; margin-bottom:10px; }
+        .lock-warning-card h4 { color:#e65100; font-size:18px; margin-bottom:5px; }
+        .lock-warning-card p { color:#555; font-size:14px; }
+
+        .order-request-card { background: #fff; padding: 22px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #FF9800; display: flex; justify-content: space-between; align-items: center; }
+        .order-request-card.accepted-style { border-left-color: #0D47A1; }
+        .order-request-card.history-style { border-left-color: #2e7d32; }
+        .order-details b { color: #0D47A1; font-size: 16px; }
+        .order-details p { color: #555; font-size: 14px; margin-top: 4px; }
+        .order-details small { color: #888; font-size: 12px; display: block; margin-top: 2px; }
+        
+        .type-indicator { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: bold; color: #fff; margin-left: 6px; text-transform: uppercase; }
+        .type-indicator.food-bg { background: #FF9800; }
+        .type-indicator.med-bg { background: #2962ff; }
+        .type-indicator.grocery-bg { background: #2e7d32; }
+        .type-indicator.parcel-bg { background: #9c27b0; }
+
+        .form-group { margin-bottom:15px; }
+        .form-group label { display:block; margin-bottom:6px; color:#333; font-weight:bold; font-size:13px; }
+        .form-group input { width:100%; padding:11px; border:1px solid #ddd; border-radius:8px; font-size:14px; }
+        .btn { padding:10px 18px; border:none; border-radius:8px; cursor:pointer; font-size:13px; font-weight:bold; transition:.2s; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background:#0D47A1; color:#fff; }
+        .btn-accept { background:#2e7d32; color:#fff; }
+        .btn-map { background:#ef6c00; color:#fff; margin-right: 5px; }
+        #routingMapBox { width: 100%; height: 420px; border-radius: 14px; border: 1px solid #ddd; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); overflow: hidden; }
+        .tab-layer-container { display: none; }
+        .tab-layer-container.active-layer { display: block; }
+        .hidden { display: none !important; }
+        
+        .modal { display:none; position:fixed; z-index:5000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; }
+        .modal.show { display:flex; }
+        .modal-content { background:#fff; padding:30px; border-radius:15px; width:90%; max-width:480px; box-shadow:0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:2px solid #eee; padding-bottom:10px; }
+        .close { font-size:24px; font-weight:bold; color:#aaa; cursor:pointer; }
+
+        .partner-time-log {
+            background: #f1f5f9; padding: 8px 12px; border-radius: 6px;
+            font-size: 12px; color: #334155; margin-top: 6px; font-weight: 500;
+        }
+
+        /* Scanner Module Structural Components */
+        .scanner-panel-wrapper { background: #fff; border-radius: 14px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid #eef2f7; max-width: 500px; margin: 0 auto; text-align: center; }
+        .qr-render-box { background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; margin: 20px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 240px; }
+        .qr-render-box img { max-width: 200px; height: auto; display: block; margin-bottom: 10px; }
+        .scanner-action-btn-row { display: flex; gap: 12px; margin-top: 15px; width: 100%; }
+
+        @media(max-width: 768px) { 
+            body { flex-direction: column; }
+            .sidebar { 
+                width: 250px; left: -260px; position: fixed; height: 100vh;
+                box-shadow: 4px 0 15px rgba(0,0,0,0.15); align-items: flex-start; padding: 20px;
+            }
+            .sidebar.expanded { left: 0px; }
+            .sidebar ul { width: 100%; }
+            .sidebar li { text-align: left; width: 100%; }
+            .sidebar li span { display: inline !important; margin-left: 10px; }
+            .logo { display: block !important; }
+            .main { margin-left: 0 !important; width: 100% !important; }
+            .content { padding: 16px; }
+            .topbar { justify-content: space-between; background: #fff; padding: 12px 16px; margin: -16px -16px 20px -16px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+            .topbar-left .menu-toggle { display: block; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="auth-container">
+        <div class="auth-card" id="partner-gate-window">
+            <div class="auth-title">QHP <span>Partner</span></div>
+            <div class="auth-subtitle" id="auth-subtitle-text">Log in to your delivery workspace</div>
+            
+            <div id="gate-credentials-step">
+                <div class="form-group"><label>Email Address Reference</label><input type="email" id="driver-email" placeholder="driver@example.com"></div>
+                <div id="driver-registration-fields" class="hidden">
+                    <div class="form-group"><label>Full Name</label><input type="text" id="driver-name" placeholder="Enter Full Name"></div>
+                    <div class="form-group"><label>Age</label><input type="number" id="driver-age" placeholder="Enter Age"></div>
+                    <div class="form-group"><label>Phone Number</label><input type="tel" id="driver-phone" placeholder="Enter Contact Number"></div>
+                    <div class="form-group"><label>Driving Licence Number (DL)</label><input type="text" id="driver-dl" placeholder="Enter DL Identifier Code"></div>
+                </div>
+                <button id="btn-partner-send-otp" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 10px;" onclick="executePartnerOTPSend()">Send Verification Security OTP</button>
+                <div class="auth-toggle-text" style="margin-top:20px;"><span id="gate-toggle-trigger" onclick="togglePartnerGateMode(true)">Create an account</span></div>
+            </div>
+            <div id="gate-otp-verification-step" class="hidden">
+                <div class="form-group"><label>Enter Secure Identity Code OTP</label><input type="text" id="driver-otp" placeholder="6-digit Token"></div>
+                <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="executePartnerVerificationVerify()">Confirm & Open Panel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <button class="menu-toggle" onclick="toggleSidebar(event)"><i class="fas fa-bars"></i></button>
+        <div class="logo" id="sidebarLogo">QHP <span>Partner</span></div>
+        <ul>
+            <li class="active" id="menu-requests" onclick="switchActiveTabLayer('requests')"><i class="fas fa-bell"></i> <span>Requests</span></li>
+            <li id="menu-accepted" onclick="switchActiveTabLayer('accepted')"><i class="fas fa-clipboard-check"></i> <span>Active Tasks</span></li>
+            <li id="menu-scanner" onclick="switchActiveTabLayer('scanner')"><i class="fas fa-qrcode"></i> <span>Scanner Tab</span></li>
+            <li id="menu-history" onclick="switchActiveTabLayer('history')"><i class="fas fa-history"></i> <span>History Manifest</span></li>
+            <li onclick="openProfileViewModal()"><i class="fas fa-user-shield"></i> <span>My Profile</span></li>
+            <li onclick="logoutPartnerAccountSystem()" style="color: #d32f2f; margin-top: 30px;"><i class="fas fa-sign-out-alt"></i> <span>Exit Systems</span></li>
+        </ul>
+    </div>
+
+    <div class="main">
+        <div class="content">
+            <div class="topbar">
+                <div class="topbar-left">
+                    <button class="menu-toggle" onclick="toggleSidebar(event)" style="margin-bottom:0; margin-right: 15px;"><i class="fas fa-bars"></i></button>
+                    <div class="topbar-company-title">QHP <span>Partner HQ</span></div>
+                </div>
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <div id="topbar-verification-status-holder"></div>
+                    <div class="profile" onclick="openProfileViewModal()">
+                        <div class="profile-avatar-circle" id="driverAvatarCircle">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="partner-gate-lock-notice" class="lock-warning-card hidden">
+                <i class="fas fa-user-lock"></i>
+                <h4>Profile Under Regulatory Evaluation Locked</h4>
+                <p>Your documentation details are currently being reviewed by admin supervisors. You will be able to accept orders as soon as your account is verified.</p>
+            </div>
+
+            <div id="tab-requests" class="tab-layer-container active-layer">
+                <h3 style="color:#333; margin-bottom:15px;">Available Requests Inside 20KM Operational Radius</h3>
+                <div id="requests-deck-feed"></div>
+            </div>
+
+            <div id="tab-accepted" class="tab-layer-container">
+                <h3 style="color:#333; margin-bottom:15px;">Your Active Logistic Route Allocations</h3>
+                <div id="routingMapBox" class="hidden"></div>
+                <div id="accepted-deck-feed"></div>
+            </div>
+
+            <div id="tab-scanner" class="tab-layer-container">
+                <h3 style="color:#333; margin-bottom:15px;">On-Demand Instant Bill Settlement Scanner</h3>
+                <div class="scanner-panel-wrapper">
+                    <div class="form-group" style="text-align: left;">
+                        <label>Settlement Billing Amount (INR)</label>
+                        <input type="number" id="scannerBillAmountInput" placeholder="Enter collection amount e.g. 250">
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; padding: 12px;" onclick="executeTriggerDynamicScannerGeneration()"><i class="fas fa-arrows-spin"></i> Generate Instant QR Scanner</button>
+                    
+                    <div id="qrViewportDisplayArea" class="qr-render-box">
+                        <p style="color: #64748b; font-size: 13px;">Specify an integer numerical parameter billing asset to project dynamic payment routing metrics above.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-history" class="tab-layer-container">
+                <h3 style="color:#333; margin-bottom:15px;">Completed Task Manifest Archives</h3>
+                <div id="history-deck-feed"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="driverProfileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3><i class="fas fa-id-card"></i> Agent Profile Sheet</h3><span class="close" onclick="closeModal('driverProfileModal')">&times;</span></div>
+            <div class="form-group"><label>Full Name</label><input type="text" id="prof-dname" readonly></div>
+            <div class="form-group"><label>Email Address</label><input type="text" id="prof-demail" readonly></div>
+            <div class="form-group"><label>Phone Number</label><input type="text" id="prof-dphone" readonly></div>
+            <div class="form-group"><label>Driving Licence Token</label><input type="text" id="prof-ddl" readonly></div>
+            <button class="btn btn-primary" style="width:100%; margin-top:10px; background:#d32f2f;" onclick="logoutPartnerAccountSystem()">🚪 Terminate Profile Session</button>
+        </div>
+    </div>
+
+    <!-- OpenLayers Core JS Ecosystem Library Bundle Injection -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v8.2.0/dist/ol.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, child, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEMuw60DEiC1WDRdQ5vslBKS8LimB_Uj0",
+            authDomain: "studyhub-33164.firebaseapp.com",
+            databaseURL: "https://studyhub-33164-default-rtdb.firebaseio.com",
+            projectId: "studyhub-33164",
+            storageBucket: "studyhub-33164.firebasestorage.app",
+            messagingSenderId: "918352715015",
+            appId: "1:918352715015:web:f92d94cb0ac679d432b9a2"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        emailjs.init({ publicKey: "QKJYCEbgKa9Htvde6" });
+
+        let gatewayOTP = null, registrationCacheObject = {}, activeDriverSession = null;
+        let driverCurrentLatitude = 12.9716, driverCurrentLongitude = 77.5946;
+        
+        // OpenLayers Ecosystem Map References Setup
+        let liveRouteMapInstance = null, vectorSourceInstance = null, vectorLayerInstance = null;
+        
+        let systemOnboardingGateIsSignUpMode = false;
+        let centralizedAdminUPIReferenceString = "";
+
+        function sanitizeEmailKeyPath(email) { return email.replace(/\./g, ','); }
+        
+        window.toggleSidebar = function(e) {
+            e.stopPropagation();
+            const sidebar = document.getElementById('sidebar');
+            const logo = document.getElementById('sidebarLogo');
+            sidebar.classList.toggle('expanded');
+            if(window.innerWidth > 768) logo.classList.toggle('show');
+        }
+
+        function executeHaversineDistanceFormulaKM(lat1, lon1, lat2, lon2) {
+            const earthRadiusKM = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return earthRadiusKM * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+
+        window.togglePartnerGateMode = function(state) {
+            systemOnboardingGateIsSignUpMode = state;
+            document.getElementById('driver-registration-fields').classList.toggle('hidden', !state);
+            document.getElementById('gate-toggle-trigger').innerText = state ? "Already registered? Access Login Panel" : "Create an account";
+        };
+
+        window.executePartnerOTPSend = async function() {
+            const email = document.getElementById('driver-email').value.trim();
+            if(!email) return alert("Please enter email address.");
+
+            const partnerBtn = document.getElementById('btn-partner-send-otp');
+            partnerBtn.disabled = true;
+            partnerBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Dispatched Code...`;
+
+            if(systemOnboardingGateIsSignUpMode) {
+                const name = document.getElementById('driver-name').value.trim();
+                const age = document.getElementById('driver-age').value.trim();
+                const phone = document.getElementById('driver-phone').value.trim();
+                const dl = document.getElementById('driver-dl').value.trim();
+                if(!name || !age || !phone || !dl) {
+                    partnerBtn.disabled = false;
+                    partnerBtn.innerText = "Send Verification Security OTP";
+                    return alert("Fill in all parameters.");
+                }
+                
+                registrationCacheObject = { fullName: name, email: email, age: age, phone: phone, dl: dl, lat: driverCurrentLatitude, lng: driverCurrentLongitude, approvalStatus: "Pending" };
+            }
+
+            const pathRefKey = sanitizeEmailKeyPath(email);
+            try {
+                const snapshot = await get(child(ref(db), `partners/${pathRefKey}`));
+                if(!systemOnboardingGateIsSignUpMode && !snapshot.exists()) {
+                    partnerBtn.disabled = false;
+                    partnerBtn.innerText = "Send Verification Security OTP";
+                    return alert("No driver account found.");
+                }
+            } catch(e) { console.error(e); }
+
+            gatewayOTP = Math.floor(100000 + Math.random() * 900000).toString();
+            emailjs.send("service_sy3140a", "template_rb6v62v", { email: email, otp: gatewayOTP }).then(() => {
+                alert("Verification OTP Dispatched to Email!");
+                document.getElementById('gate-credentials-step').classList.add('hidden');
+                document.getElementById('gate-otp-verification-step').classList.remove('hidden');
+            }).catch(() => {
+                partnerBtn.disabled = false;
+                partnerBtn.innerText = "Send Verification Security OTP";
+                alert("Failed to send code.");
+            });
+        };
+
+        window.executePartnerVerificationVerify = function() {
+            if(document.getElementById('driver-otp').value.trim() !== gatewayOTP) return alert("OTP Mismatch.");
+            const email = document.getElementById('driver-email').value.trim();
+            const pathRefKey = sanitizeEmailKeyPath(email);
+
+            if(systemOnboardingGateIsSignUpMode) {
+                set(ref(db, 'partners/' + pathRefKey), registrationCacheObject).then(() => initializeDriverWorkspaceSession(registrationCacheObject));
+            } else {
+                get(child(ref(db), `partners/${pathRefKey}`)).then(snap => {
+                    if(snap.exists()) initializeDriverWorkspaceSession(snap.val());
+                });
+            }
+        };
+
+        function initializeDriverWorkspaceSession(profileObj) {
+            activeDriverSession = profileObj;
+            localStorage.setItem("qhp_active_agent_profile", JSON.stringify(profileObj));
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('driverAvatarCircle').innerText = profileObj.fullName ? profileObj.fullName.charAt(0).toUpperCase() : "A";
+            startLiveAgentGPSPositionWatcherPipeline();
+            connectGlobalEcosystemStreams();
+            listenToCentralUPIConfigChanges();
+        }
+
+        function startLiveAgentGPSPositionWatcherPipeline() {
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(pos => {
+                    driverCurrentLatitude = pos.coords.latitude; driverCurrentLongitude = pos.coords.longitude;
+                    if(activeDriverSession) {
+                        update(ref(db, `partners/${sanitizeEmailKeyPath(activeDriverSession.email)}`), { lat: driverCurrentLatitude, lng: driverCurrentLongitude });
+                    }
+                }, null, { enableHighAccuracy: true });
+            }
+        }
+
+        window.switchActiveTabLayer = function(tabName) {
+            document.querySelectorAll('.tab-layer-container').forEach(panel => panel.classList.remove('active-layer'));
+            document.querySelectorAll('.sidebar ul li').forEach(li => li.classList.remove('active'));
+            if(document.getElementById(`menu-${tabName}`)) {
+                document.getElementById(`menu-${tabName}`).classList.add('active');
+            }
+            document.getElementById(`tab-${tabName}`).classList.add('active-layer');
+            if(tabName !== 'accepted' && liveRouteMapInstance) document.getElementById('routingMapBox').classList.add('hidden');
+        };
+
+        function listenToCentralUPIConfigChanges() {
+            onValue(ref(db, 'hotlines/upiId'), snapshot => {
+                centralizedAdminUPIReferenceString = snapshot.val() || "";
+            });
+        }
+
+        window.executeTriggerDynamicScannerGeneration = function() {
+            const viewport = document.getElementById('qrViewportDisplayArea');
+            const amt = document.getElementById('scannerBillAmountInput').value.trim();
+            if(!amt || parseInt(amt) <= 0) return alert("Please supply a valid settlement transaction total amount.");
+
+            if(!centralizedAdminUPIReferenceString || centralizedAdminUPIReferenceString.trim() === "") {
+                viewport.innerHTML = `
+                    <div style="color: #b91c1c; font-weight: bold; padding: 15px;">
+                        <i class="fas fa-triangle-exclamation" style="font-size: 28px; margin-bottom: 8px;"></i><br>
+                        ⚠️ UPI Service Unavailable.<br>Please accept cash settlement from user instead.
+                    </div>`;
+                return;
+            }
+
+            const upiString = `upi://pay?pa=${encodeURIComponent(centralizedAdminUPIReferenceString)}&pn=QHP%20Ecosystem&am=${amt}&cu=INR`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+
+            viewport.innerHTML = `
+                <h4 style="color: #0D47A1; margin-bottom: 10px;">Collect Amount: ₹${amt}</h4>
+                <img src="${qrUrl}" alt="Payment Settlement Matrix Card Image Scanner">
+                <div class="scanner-action-btn-row">
+                    <button class="btn btn-reject" style="flex:1;" onclick="clearSettlementScannerViewport()">Cancel</button>
+                    <button class="btn btn-accept" style="flex:1;" onclick="executeProcessAgentManualScannerPaidRecord(${amt})">Paid by User</button>
+                </div>`;
+        };
+
+        window.clearSettlementScannerViewport = function() {
+            document.getElementById('scannerBillAmountInput').value = "";
+            document.getElementById('qrViewportDisplayArea').innerHTML = `
+                <p style="color: #64748b; font-size: 13px;">Specify an integer numerical parameter billing asset to project dynamic payment routing metrics above.</p>`;
+            alert("Settlement tracking instance cleared.");
+        };
+
+        window.executeProcessAgentManualScannerPaidRecord = function(loggedBillAmount) {
+            if(!activeDriverSession) return;
+            const uniqueBillRecordId = "BILL" + Math.floor(100000 + Math.random() * 900000);
+            
+            const payload = {
+                billId: uniqueBillRecordId,
+                agentName: activeDriverSession.fullName,
+                agentEmail: activeDriverSession.email,
+                amountCollected: loggedBillAmount,
+                timestamp: Date.now(),
+                mode: "UPI QR Scanner"
+            };
+
+            set(ref(db, `upiBills/${uniqueBillRecordId}`), payload).then(() => {
+                alert(`Bill verified safely! Transaction Registered under ID: ${uniqueBillRecordId}`);
+                
+                const archivalLogPayload = {
+                    orderId: uniqueBillRecordId,
+                    orderType: "Scanner Settlement",
+                    restaurant: "Direct Link UPI Terminal",
+                    foodItems: `Total Collected Asset Sum Value: INR ${loggedBillAmount}`,
+                    userName: "Direct Walk-In Client",
+                    userPhone: "N/A",
+                    status: "Delivered",
+                    partnerEmail: activeDriverSession.email,
+                    partnerName: activeDriverSession.fullName,
+                    deliveryTimeMetrics: Date.now()
+                };
+                
+                set(ref(db, `orders/${uniqueBillRecordId}`), archivalLogPayload).then(() => {
+                    clearSettlementScannerViewport();
+                    switchActiveTabLayer('history');
+                });
+            });
+        };
+
+        function connectGlobalEcosystemStreams() {
+            if(!activeDriverSession) return;
+            
+            onValue(ref(db, `partners/${sanitizeEmailKeyPath(activeDriverSession.email)}`), snap => {
+                if(snap.exists()) {
+                    const data = snap.val();
+                    activeDriverSession.approvalStatus = data.approvalStatus || "Pending";
+                    
+                    const badgeBox = document.getElementById('topbar-verification-status-holder');
+                    const warningCard = document.getElementById('partner-gate-lock-notice');
+
+                    if(activeDriverSession.approvalStatus === "Approved") {
+                        badgeBox.innerHTML = `<span class="verification-badge"><i class="fas fa-circle-check"></i> Verified by QHP ✔</span>`;
+                        warningCard.classList.add('hidden');
+                    } else {
+                        badgeBox.innerHTML = `<span class="verification-badge unverified-state"><i class="fas fa-hourglass-half"></i> Pending QHP Check</span>`;
+                        warningCard.classList.remove('hidden');
+                    }
+                }
+            });
+
+            onValue(ref(db, 'orders'), snapshot => {
+                const reqBox = document.getElementById('requests-deck-feed');
+                const accBox = document.getElementById('accepted-deck-feed');
+                const histBox = document.getElementById('history-deck-feed');
+                let reqHtml = "", accHtml = "", histHtml = "";
+                let countReq = 0, countAcc = 0, countHist = 0;
+
+                snapshot.forEach(childSnap => {
+                    const o = childSnap.val();
+                    let distanceKM = executeHaversineDistanceFormulaKM(driverCurrentLatitude, driverCurrentLongitude, o.deliveryLat || driverCurrentLatitude, o.deliveryLng || driverCurrentLongitude);
+                    
+                    let badgeTheme = "food-bg";
+                    if(o.orderType === "Medicine") badgeTheme = "med-bg";
+                    if(o.orderType === "Grocery") badgeTheme = "grocery-bg";
+                    if(o.orderType === "Parcel") badgeTheme = "parcel-bg";
+                    if(o.orderType === "Scanner Settlement") badgeTheme = "food-bg";
+                    let typeBadge = `<span class="type-indicator ${badgeTheme}">${o.orderType || 'Food'}</span>`;
+
+                    if(o.status === "Processing" && distanceKM <= 20) {
+                        countReq++;
+                        if(activeDriverSession.approvalStatus === "Approved") {
+                            reqHtml += `
+                                <div class="order-request-card">
+                                    <div class="order-details">
+                                        <b>#${o.orderId}</b> ${typeBadge}<br>Vendor/Target: ${o.restaurant}
+                                        <p style="margin-top:4px;">Manifest Payload: ${o.foodItems}</p>
+                                        <small style="color: #ef6c00; font-weight: bold; margin-top:4px;"><i class="fas fa-location-arrow"></i> Radius: ${distanceKM.toFixed(2)} KM</small>
+                                    </div>
+                                    <button class="btn btn-accept" onclick="executeTriggerOrderStatusChange('${o.orderId}', 'Get a call')">Accept Task</button>
+                                </div>`;
+                        } else {
+                            reqHtml += `
+                                <div class="order-request-card" style="opacity:0.6; pointer-events:none;">
+                                    <div class="order-details"><b>#${o.orderId}</b> - [Locked: Profile Check Required]</div>
+                                </div>`;
+                        }
+                    } else if(o.partnerEmail === activeDriverSession.email) {
+                        
+                        let runtimeLiveStates = ["Get a call", "Call Confirmed", "On The Way", "On Your Doorstep"];
+
+                        if(runtimeLiveStates.includes(o.status)) {
+                            countAcc++;
+                            
+                            let btnLabel = "";
+                            let nextState = "";
+                            let statusDisplayValue = o.status;
+
+                            if(o.status === "Get a call") {
+                                btnLabel = "📞 Call Confirmed";
+                                nextState = "Call Confirmed";
+                                statusDisplayValue = "Call Received";
+                            } else if(o.status === "Call Confirmed") {
+                                btnLabel = "🚀 Dispatch on Route";
+                                nextState = "On The Way";
+                            } else if(o.status === "On The Way") {
+                                btnLabel = "📍 Arrived on Doorstep";
+                                nextState = "On Your Doorstep";
+                            } else if(o.status === "On Your Doorstep") {
+                                btnLabel = "🏁 Order Delivered";
+                                nextState = "Delivered";
+                            }
+
+                            let mapCallFunction = `renderDynamicNavigationRouteTrack(${o.deliveryLat}, ${o.deliveryLng}, null, null)`;
+                            if(o.orderType === "Parcel") {
+                                mapCallFunction = `renderDynamicNavigationRouteTrack(${o.deliveryLat}, ${o.deliveryLng}, ${o.pickupLat}, ${o.pickupLng})`;
+                            }
+
+                            let logMarkupsPartner = "";
+                            if(o.callConfirmedTime) {
+                                let confPartnerTime = new Date(o.callConfirmedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                logMarkupsPartner += `<div>• Confirmed Time Node: ${confPartnerTime}</div>`;
+                            }
+                            if(o.doorstepTime && o.callConfirmedTime) {
+                                let diffMinsPartner = Math.floor((o.doorstepTime - o.callConfirmedTime) / (1000 * 60));
+                                logMarkupsPartner += `<div style="color:#dc2626; font-weight:bold;">• Spent Interval: ${diffMinsPartner} mins spent</div>`;
+                            }
+
+                            if(logMarkupsPartner !== "") {
+                                logMarkupsPartner = `<div class="partner-time-log">${logMarkupsPartner}</div>`;
+                            }
+
+                            accHtml += `
+                                <div class="order-request-card accepted-style">
+                                    <div class="order-details">
+                                        <b>#${o.orderId}</b> ${typeBadge} [State: ${statusDisplayValue}]<br>
+                                        <p style="margin-top:4px;">Route Contact: ${o.userName} (${o.userPhone})</p>
+                                        <p style="font-size: 13px; color: #555; margin-top:2px;"><strong>Payload:</strong> ${o.foodItems}</p>
+                                        ${logMarkupsPartner}
+                                    </div>
+                                    <div style="white-space:nowrap; display:flex; flex-direction:column; gap:8px; align-items:center;">
+                                        <button class="btn btn-map" style="width:100%;" onclick="${mapCallFunction}"><i class="fas fa-map-location-dot"></i> Route</button>
+                                        <button class="btn btn-primary" style="width:100%;" onclick="executeTriggerOrderStatusChange('${o.orderId}', '${nextState}')">${btnLabel}</button>
+                                    </div>
+                                </div>`;
+                        } else if(o.status === "Delivered") {
+                            countHist++;
+                            
+                            let logMarkupsHistory = "";
+                            if(o.callConfirmedTime) {
+                                let historyConfStr = new Date(o.callConfirmedTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                logMarkupsHistory += ` [Confirmed: ${historyConfStr}]`;
+                            }
+                            if(o.doorstepTime && o.callConfirmedTime) {
+                                let historySpent = Math.floor((o.doorstepTime - o.callConfirmedTime) / (1000 * 60));
+                                logMarkupsHistory += ` [Duration: ${historySpent} mins spent]`;
+                            }
+                            if(o.deliveryTimeMetrics) {
+                                let historyDelStr = new Date(o.deliveryTimeMetrics).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                                logMarkupsHistory += ` [Delivered At: ${historyDelStr}]`;
+                            }
+
+                            histHtml += `
+                                <div class="order-request-card history-style">
+                                    <div class="order-details">
+                                        <b>#${o.orderId}</b> ${typeBadge} - Handed over safely to ${o.userName}
+                                        <small style="margin-top: 4px; color:#475569; font-weight:bold;">${logMarkupsHistory}</small>
+                                    </div>
+                                </div>`;
+                        }
+                    }
+                });
+
+                if(activeDriverSession.approvalStatus === "Approved") {
+                    reqBox.innerHTML = countReq > 0 ? reqHtml : `<p style="color:#888;">No dispatch matches available within 20KM radius.</p>`;
+                } else {
+                    reqBox.innerHTML = `<p style="color:#ef6c00; font-weight:bold; text-align:center;">⚠️ Pipeline locked.</p>`;
+                }
+                accBox.innerHTML = countAcc > 0 ? accHtml : `<p style="color:#888;">No active routes.</p>`;
+                histBox.innerHTML = countHist > 0 ? histHtml : `<p style="color:#888;">No metrics archived yet.</p>`;
+            });
+        }
+
+        window.executeTriggerOrderStatusChange = function(orderId, nextState) {
+            const updates = { status: nextState };
+            let currentTimestampValue = Date.now();
+
+            if(nextState === "Get a call") {
+                updates.partnerEmail = activeDriverSession.email;
+                updates.partnerName = activeDriverSession.fullName;
+                updates.partnerPhone = activeDriverSession.phone;
+            }
+            else if(nextState === "Call Confirmed") {
+                updates.callConfirmedTime = currentTimestampValue;
+            }
+            else if(nextState === "On Your Doorstep") {
+                updates.doorstepTime = currentTimestampValue;
+            }
+            else if(nextState === "Delivered") {
+                updates.deliveryTimeMetrics = currentTimestampValue;
+            }
+
+            update(ref(db, `orders/${orderId}`), updates).then(() => { 
+                if(nextState === "Get a call") switchActiveTabLayer('accepted'); 
+            });
+        };
+
+        // OpenLayers Live Driving Best Route Injection via OSRM API
+        window.renderDynamicNavigationRouteTrack = function(destLat, destLng, pickLat = null, pickLng = null) {
+            document.getElementById('routingMapBox').classList.remove('hidden');
+            setTimeout(async () => {
+                const driverLonLat = [driverCurrentLongitude, driverCurrentLatitude];
+                const destLonLat = [destLng, destLat];
+
+                // Setup OpenLayers instance if not previously declared
+                if (!liveRouteMapInstance) {
+                    vectorSourceInstance = new ol.source.Vector();
+                    vectorLayerInstance = new ol.layer.Vector({
+                        source: vectorSourceInstance
+                    });
+
+                    liveRouteMapInstance = new ol.Map({
+                        target: 'routingMapBox',
+                        layers: [
+                            new ol.layer.Tile({
+                                source: new ol.source.OSM()
+                            }),
+                            vectorLayerInstance
+                        ],
+                        view: new ol.View({
+                            center: ol.proj.fromLonLat(driverLonLat),
+                            zoom: 13
+                        })
+                    });
+                } else {
+                    liveRouteMapInstance.setTarget('routingMapBox');
+                    liveRouteMapInstance.updateSize();
+                    vectorSourceInstance.clear();
+                }
+
+                // Helper marker point design style mapping logic
+                const createMarkerStyle = (color) => {
+                    return new ol.style.Style({
+                        image: new ol.style.Circle({
+                            radius: 9,
+                            fill: new ol.style.Fill({ color: color }),
+                            stroke: new ol.style.Stroke({ color: '#fff', width: 3 })
+                        })
+                    });
+                };
+
+                // Add Location Node Pin Features
+                const driverFeature = new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat(driverLonLat)) });
+                driverFeature.setStyle(createMarkerStyle('#0D47A1'));
+                vectorSourceInstance.addFeature(driverFeature);
+
+                const destFeature = new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat(destLonLat)) });
+                destFeature.setStyle(createMarkerStyle('#d32f2f'));
+                vectorSourceInstance.addFeature(destFeature);
+
+                // Compile Coordinate Query Array for Driving Network Path Tracking
+                let queryCoordinates = `${driverLonLat[0]},${driverLonLat[1]}`;
+                
+                if (pickLat && pickLng) {
+                    const pickLonLat = [pickLng, pickLat];
+                    const pickFeature = new ol.Feature({ geometry: new ol.geom.Point(ol.proj.fromLonLat(pickLonLat)) });
+                    pickFeature.setStyle(createMarkerStyle('#9c27b0'));
+                    vectorSourceInstance.addFeature(pickFeature);
+                    
+                    queryCoordinates += `;${pickLonLat[0]},${pickLonLat[1]}`;
+                }
+                
+                queryCoordinates += `;${destLonLat[0]},${destLonLat[1]}`;
+
+                // Fetching the Best Actual Road Route from OSRM Routing Engine
+                try {
+                    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${queryCoordinates}?overview=full&geometries=geojson`;
+                    const response = await fetch(osrmUrl);
+                    const routeData = await response.json();
+
+                    if (routeData.code === 'Ok' && routeData.routes.length > 0) {
+                        const geometryCoordinates = routeData.routes[0].geometry.coordinates;
+                        
+                        // Transforming road coordinates into map target projection units
+                        const transformedRouteCoords = geometryCoordinates.map(coord => ol.proj.fromLonLat(coord));
+                        
+                        const roadLineFeature = new ol.Feature({
+                            geometry: new ol.geom.LineString(transformedRouteCoords)
+                        });
+                        
+                        roadLineFeature.setStyle(new ol.style.Style({
+                            stroke: new ol.style.Stroke({
+                                color: '#0D47A1',
+                                width: 5
+                            })
+                        }));
+                        vectorSourceInstance.addFeature(roadLineFeature);
+                    } else {
+                        throw new Error("Fallback to straight tracking line required.");
+                    }
+                } catch (e) {
+                    console.warn("OSRM routing layout skipped or blocked, triggering direct path fallback.", e);
+                    // Fallback Straight Path Routing Strategy configuration
+                    let straightCoords = [driverLonLat];
+                    if (pickLat && pickLng) straightCoords.push([pickLng, pickLat]);
+                    straightCoords.push(destLonLat);
+
+                    const transformedFallback = straightCoords.map(c => ol.proj.fromLonLat(c));
+                    const fallbackLineFeature = new ol.Feature({ geometry: new ol.geom.LineString(transformedFallback) });
+                    fallbackLineFeature.setStyle(new ol.style.Style({
+                        stroke: new ol.style.Stroke({ color: '#ef6c00', width: 4, lineDash: [6, 6] })
+                    }));
+                    vectorSourceInstance.addFeature(fallbackLineFeature);
+                }
+
+                // Smooth fitting view boundary setup adjustments
+                const layerExtent = vectorSourceInstance.getExtent();
+                liveRouteMapInstance.getView().fit(layerExtent, { padding: [60, 60, 60, 60], duration: 400 });
+            }, 250);
+        };
+
+        window.openProfileViewModal = function() {
+            if(!activeDriverSession) return;
+            document.getElementById('prof-dname').value = activeDriverSession.fullName;
+            document.getElementById('prof-demail').value = activeDriverSession.email;
+            document.getElementById('prof-dphone').value = activeDriverSession.phone;
+            document.getElementById('prof-ddl').value = activeDriverSession.dl;
+            document.getElementById('driverProfileModal').classList.add('show');
+        };
+
+        window.closeModal = function(id) { document.getElementById(id).classList.remove('show'); };
+        window.logoutPartnerAccountSystem = function() { localStorage.clear(); location.reload(); };
+
+        window.onclick = function(e) {
+            if (e.target === document.getElementById('driverProfileModal')) closeModal('driverProfileModal');
+        };
+
+        window.addEventListener('load', () => {
+            const localSavedAgentProfileSession = localStorage.getItem("qhp_active_agent_profile");
+            if (localSavedAgentProfileSession) {
+                initializeDriverWorkspaceSession(JSON.parse(localSavedAgentProfileSession));
+            }
+        });
+    </script>
+</body>
+</html>
